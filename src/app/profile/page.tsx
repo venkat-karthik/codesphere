@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import {
+import { useState, useEffect } from "react";import {
     MapPin,
     Link as LinkIcon,
     Calendar,
@@ -53,15 +52,18 @@ export default function ProfilePage() {
     const profile = {
         name: user?.name || "CodeSphere User",
         email: user?.email || "user@codesphere.io",
-        handle: user?.email?.split('@')[0] || "user",
+        handle: user?.username || user?.email?.split('@')[0] || "user",
         avatar: user?.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase() || "CU",
         bio: user?.bio || "CodeSphere learner and developer. Passionate about building the future of the web.",
         location: user?.location || "Global",
+        website: user?.website || "",
         joinedDate: user?.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : "March 2026",
         skills: user?.skills?.length ? user.skills : ["React", "TypeScript", "Next.js", "Node.js", "Tailwind CSS"],
-        following: 0,
-        followers: 0
+        following: user?.following ?? 142,
+        followers: user?.followers ?? 1200,
     };
+
+    const [activeTab, setActiveTab] = useState("overview");
 
     return (
         <div className="min-h-screen bg-background flex flex-col">
@@ -96,8 +98,8 @@ export default function ProfilePage() {
                         </div>
 
                         <div className="flex gap-4 mt-6">
-                            <div className="text-sm"><span className="font-bold text-foreground">142</span> <span className="text-muted-foreground">Following</span></div>
-                            <div className="text-sm"><span className="font-bold text-foreground">1.2K</span> <span className="text-muted-foreground">Followers</span></div>
+                            <div className="text-sm"><span className="font-bold text-foreground">{profile.following.toLocaleString()}</span> <span className="text-muted-foreground">Following</span></div>
+                            <div className="text-sm"><span className="font-bold text-foreground">{profile.followers.toLocaleString()}</span> <span className="text-muted-foreground">Followers</span></div>
                         </div>
                     </div>
                 </div>
@@ -107,12 +109,14 @@ export default function ProfilePage() {
                 {/* Main Content */}
                 <div className="space-y-8">
                     <div className="flex items-center gap-6 border-b border-border/40 pb-2 text-sm font-medium">
-                        <button className="text-foreground border-b-2 border-primary pb-2">Overview</button>
-                        <button className="text-muted-foreground hover:text-foreground pb-2 transition-colors">Activity</button>
-                        <button className="text-muted-foreground hover:text-foreground pb-2 transition-colors">Certificates (3)</button>
+                        <button onClick={() => setActiveTab("overview")} className={`pb-2 transition-colors ${activeTab === "overview" ? "text-foreground border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"}`}>Overview</button>
+                        <button onClick={() => setActiveTab("activity")} className={`pb-2 transition-colors ${activeTab === "activity" ? "text-foreground border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"}`}>Activity</button>
+                        <button onClick={() => setActiveTab("certificates")} className={`pb-2 transition-colors ${activeTab === "certificates" ? "text-foreground border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"}`}>Certificates ({user?.certificates?.length ?? 3})</button>
                     </div>
 
-                    <div>
+                    {activeTab === "overview" && (
+                        <div className="space-y-8">
+                        <div>
                         <h3 className="font-semibold text-lg flex items-center gap-2 mb-4"><Star className="w-5 h-5 text-yellow-500" /> Top OSS Contributions</h3>
                         <div className="grid sm:grid-cols-2 gap-4">
                             {[1, 2].map(i => (
@@ -131,11 +135,9 @@ export default function ProfilePage() {
                                 </Card>
                             ))}
                         </div>
-                    </div>
-
-                    <Separator className="bg-border/40" />
-
-                    <div>
+                        </div>
+                        <Separator className="bg-border/40" />
+                        <div>
                         <h3 className="font-semibold text-lg flex items-center gap-2 mb-4"><Layers className="w-5 h-5 text-blue-500" /> Learning Progress</h3>
                         <div className="space-y-3">
                             <div className="flex items-center justify-between p-3 rounded-lg border border-border/40 bg-card/50">
@@ -147,10 +149,24 @@ export default function ProfilePage() {
                                 <Badge className="bg-green-500/20 text-green-400 border-none px-2 h-5 text-[10px]">100% Complete</Badge>
                             </div>
                         </div>
-                    </div>
-                </div>
+                        </div>
+                        </div>
+                    )}
 
-                {/* Sidebar Space */}
+                    {activeTab === "activity" && (
+                        <div className="text-center py-12 text-muted-foreground">
+                            <MessageSquare className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                            <p>Activity feed coming soon.</p>
+                        </div>
+                    )}
+
+                    {activeTab === "certificates" && (
+                        <div className="text-center py-12 text-muted-foreground">
+                            <Trophy className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                            <p>Certificates will appear here once you complete learning paths.</p>
+                        </div>
+                    )}
+                </div>
                 <div className="space-y-6">
                     <div className="border border-border/40 bg-card/50 rounded-xl p-5 space-y-4">
                         <h3 className="font-semibold text-sm flex items-center gap-2">
