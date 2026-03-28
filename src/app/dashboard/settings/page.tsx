@@ -14,6 +14,7 @@ export default function SettingsPage() {
     const [saving, setSaving] = useState(false);
     const [form, setForm] = useState({ name: "", username: "", bio: "", website: "" });
     const fileRef = useRef<HTMLInputElement>(null);
+    const [activeSection, setActiveSection] = useState("Profile");
 
     useEffect(() => {
         apiFetch("/users/me").then((data) => {
@@ -56,7 +57,7 @@ export default function SettingsPage() {
                 {/* Settings Nav Area */}
                 <aside className="mb-8 md:mb-0 space-y-1">
                     {[
-                        { label: "Profile", icon: User, active: true },
+                        { label: "Profile", icon: User },
                         { label: "Account", icon: LayoutDashboard },
                         { label: "Security", icon: Shield },
                         { label: "Emails", icon: Mail },
@@ -64,7 +65,8 @@ export default function SettingsPage() {
                     ].map((item) => (
                         <button
                             key={item.label}
-                            className={`flex items-center gap-3 w-full px-3 py-2 text-sm rounded-lg transition-colors ${item.active
+                            onClick={() => setActiveSection(item.label)}
+                            className={`flex items-center gap-3 w-full px-3 py-2 text-sm rounded-lg transition-colors ${activeSection === item.label
                                 ? "bg-primary/10 text-primary font-medium"
                                 : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                                 }`}

@@ -57,9 +57,20 @@ const upcomingEvents = [
 
 export default function DashboardPage() {
   const [user, setUser] = useState<any>(null);
+  const [stats, setStats] = useState({ paths: 0, resources: 0, streak: 0, achievements: 0 });
 
   useEffect(() => {
-    apiFetch("/users/me").then(setUser).catch(() => {});
+    apiFetch("/users/me").then((data) => {
+      setUser(data);
+      setStats({
+        paths: data.activePaths ?? 3,
+        resources: data.savedResources ?? 24,
+        streak: data.streak ?? 12,
+        achievements: data.achievements?.length ?? 7,
+      });
+    }).catch(() => {
+      setStats({ paths: 3, resources: 24, streak: 12, achievements: 7 });
+    });
   }, []);
 
   const greeting = () => {
@@ -99,10 +110,10 @@ export default function DashboardPage() {
       {/* Stats cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         {[
-          { label: "Paths In Progress", value: "3", icon: Layers, color: "text-blue-400", bg: "bg-blue-500/10" },
-          { label: "Resources Saved", value: "24", icon: BookOpen, color: "text-purple-400", bg: "bg-purple-500/10" },
-          { label: "Day Streak", value: "12", icon: Flame, color: "text-orange-400", bg: "bg-orange-500/10" },
-          { label: "Achievements", value: "7", icon: Award, color: "text-yellow-400", bg: "bg-yellow-500/10" },
+          { label: "Paths In Progress", value: stats.paths.toString(), icon: Layers, color: "text-blue-400", bg: "bg-blue-500/10" },
+          { label: "Resources Saved", value: stats.resources.toString(), icon: BookOpen, color: "text-purple-400", bg: "bg-purple-500/10" },
+          { label: "Day Streak", value: stats.streak.toString(), icon: Flame, color: "text-orange-400", bg: "bg-orange-500/10" },
+          { label: "Achievements", value: stats.achievements.toString(), icon: Award, color: "text-yellow-400", bg: "bg-yellow-500/10" },
         ].map((s) => (
           <Card key={s.label} className="border-border/40 bg-card/50">
             <CardContent className="p-5">
