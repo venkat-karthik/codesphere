@@ -16,27 +16,27 @@ export default function AdminLockPage() {
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
 
-    // Default admin key for this implementation
-    const ADMIN_SECRET = "CODESPHERE_ADMIN_2026";
-
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError("");
         setLoading(true);
 
         try {
-            // Simulate a secure check
-            await new Promise(resolve => setTimeout(resolve, 800));
+            const res = await fetch("/api/admin/verify-key", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ key }),
+            });
 
-            if (key === ADMIN_SECRET) {
-                // Set cookie
+            if (res.ok) {
                 document.cookie = `admin-verified=true; path=/; max-age=${60 * 60 * 24}; SameSite=Strict`;
                 router.push(returnUrl);
                 router.refresh();
             } else {
-                setError("Invalid administrative key. Access denied.");
+                const data = await res.json().catch(() => ({}));
+                setError(data.error || "Invalid administrative key. Access denied.");
             }
-        } catch (err) {
+        } catch {
             setError("A system error occurred. Please try again.");
         } finally {
             setLoading(false);

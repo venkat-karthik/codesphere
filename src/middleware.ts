@@ -1,60 +1,72 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-// Define which routes require authentication
 const protectedRoutes = [
-    "/dashboard",
-    "/admin",
-    "/learning",
-    "/resources",
-    "/tests",
-    "/communities",
-    "/sessions",
-    "/codex",
-    "/sandbox",
-    "/checkout"
+  "/dashboard",
+  "/admin",
+  "/learning",
+  "/resources",
+  "/tests",
+  "/communities",
+  "/sessions",
+  "/codex",
+  "/sandbox",
+  "/checkout",
 ];
 
-export function middleware(request: NextRequest) {
-    const { pathname } = request.nextUrl;
-
-    // Check if the current route is protected
-    const isProtected = protectedRoutes.some((route) => pathname.startsWith(route));
-    const isAdminRoute = pathname.startsWith("/admin");
-    const isLockPage = pathname === "/admin/lock";
-
-    if (isAdminRoute && !isLockPage) {
-        const adminVerified = request.cookies.get("admin-verified");
-        if (!adminVerified) {
-            const origin = request.nextUrl.origin;
-            return NextResponse.redirect(`${origin}/admin/lock?returnUrl=${encodeURIComponent(pathname)}`);
-        }
-    }
-
-    if (isProtected) {
-        // Check for our mock auth cookie
-        const token = request.cookies.get("auth-token");
-
-        if (!token) {
-            // If not authenticated, redirect to login with a returnUrl
-            const origin = request.nextUrl.origin;
-            return NextResponse.redirect(`${origin}/login?returnUrl=${encodeURIComponent(pathname)}`);
-        }
-    }
-
-    return NextResponse.next();
+/** Minimal JWT structure check — three base64url segments separated by dots. */
+function isValidJwtShape(token: string): boolean {
+  const parts = token.split(".");
+  if (parts.length !== 3) return false;
+  try {
+    // Verify each part is valid base64url
+    parts.forEach((p) => atob(p.replace(/-/g, "+").replace(/_/g, "/")));
+    // Decode payload and check expiry if present
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+    if (payload.exp && Date.now() / 1000 > payload.exp) return false;
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-// Optionally, don't run middleware on static files, api routes, etc.
+export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  const origin = request.nextUrl.origin;
+
+  const isProtected = protectedRoutes.some((route) => pathname.startsWith(route));
+  const isAdminRoute = pathname.startsWith("/admin");
+  const isLockPage = pathname === "/admin/lock";
+
+  // Admin secondary verification (separate from auth)
+  if (isAdminRoute && !isLockPage) {
+    const adminVerified = request.cookies.get("admin-verified");
+    if (!adminVerified) {
+      return NextResponse.redirect(
+        `${origin}/admin/lock?returnUrl=${encodeURIComponent(pathname)}`
+      );
+    }
+  }
+
+  if (isProtected) {
+    const tokenCookie = request.cookies.get("auth-token");
+    const token = tokenCookie?.value;
+
+    if (!token || !isValidJwtShape(token)) {
+      // Clear any malformed/expired token cookie
+      const response = NextResponse.redirect(
+        `${origin}/login?returnUrl=${encodeURIComponent(pathname)}`
+      );
+      if (token) {
+        response.cookies.delete("auth-token");
+      }
+      return response;
+    }
+  }
+
+  return NextResponse.next();
+}
+
 export const config = {
-    matcher: [
-        /*
-         * Match all request paths except for the ones starting with:
-         * - api (API routes)
-         * - _next/static (static files)
-         * - _next/image (image optimization files)
-         * - favicon.ico (favicon file)
-         */
-        "/((?!api|_next/static|_next/image|favicon.ico).*)",
-    ],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
 };

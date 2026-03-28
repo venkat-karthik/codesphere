@@ -33,9 +33,9 @@ export default function CommunityChat({ communityId, userId }: { communityId: st
         const fetchHistory = async () => {
             try {
                 const data = await apiFetch(`/communities/${communityId}/messages`);
-                setMessages(data);
-            } catch (error) {
-                console.error("Failed to fetch chat history:", error);
+                setMessages(Array.isArray(data) ? data : []);
+            } catch {
+                // Backend unavailable — start with empty history
             } finally {
                 setLoading(false);
             }
@@ -43,11 +43,22 @@ export default function CommunityChat({ communityId, userId }: { communityId: st
 
         fetchHistory();
 
-        // Connect WebSocket
-        const newSocket = io(process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001");
-        setSocket(newSocket);
+        // Connect WebSocket — gracefully degrade if server is unavailable
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+        const newSocket = io(apiUrl, {
+            reconnectionAttempts: 3,
+            timeout: 5000,
+        });
 
-        newSocket.emit("joinRoom", communityId);
+        newSocket.on("connect_error", () => {
+            // Socket unavailable — chat works in degraded (no real-time) mode
+            setSocket(null);
+        });
+
+        newSocket.on("connect", () => {
+            setSocket(newSocket);
+            newSocket.emit("joinRoom", communityId);
+        });
 
         newSocket.on("message", (message: Message) => {
             setMessages((prev) => [...prev, message]);
@@ -67,7 +78,12 @@ export default function CommunityChat({ communityId, userId }: { communityId: st
 
     const handleSendMessage = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!input.trim() || !socket) return;
+        if (!input.trim()) return;
+
+        if (!socket?.connected) {
+            toast.error("Real-time chat is unavailable. The backend server is not connected.");
+            return;
+        }
 
         const messageData = {
             communityId,
