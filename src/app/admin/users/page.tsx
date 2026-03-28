@@ -33,35 +33,52 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { apiFetch } from "@/lib/api";
+import { toast } from "sonner";
 
 export default function UserManagementPage() {
     const [users, setUsers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
 
-    useEffect(() => {
-        const fetchUsers = async () => {
-            try {
-                // In a real app, we'd fetch from /admin/users
-                // For now, let's mock some data or use existing /users if available
-                const data = await apiFetch('/users'); 
-                setUsers(Array.isArray(data) ? data : []);
-            } catch (error) {
-                console.error("Failed to fetch users:", error);
-                // Mock data if fetch fails
-                setUsers([
-                    { id: "1", name: "Venkat Karthik", email: "venkat@codesphere.io", role: "admin", status: "active", joined: "2024-01-15" },
-                    { id: "2", name: "Sarah Chen", email: "sarah.c@gmail.com", role: "moderator", status: "active", joined: "2024-02-10" },
-                    { id: "3", name: "Alex Rivera", email: "arivera@tech.co", role: "user", status: "active", joined: "2024-02-28" },
-                    { id: "4", name: "James Wilson", email: "j.wilson@outlook.com", role: "user", status: "suspended", joined: "2024-03-05" },
-                    { id: "5", name: "Elena Petrova", email: "elena@design.io", role: "user", status: "active", joined: "2024-03-12" },
-                ]);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchUsers();
-    }, []);
+    const fetchUsers = async () => {
+        try {
+            const data = await apiFetch('/admin/users');
+            setUsers(Array.isArray(data) ? data : []);
+        } catch {
+            setUsers([
+                { id: "1", name: "Venkat Karthik", email: "venkat@codesphere.io", role: "admin", status: "active", joined: "2024-01-15" },
+                { id: "2", name: "Sarah Chen", email: "sarah.c@gmail.com", role: "moderator", status: "active", joined: "2024-02-10" },
+                { id: "3", name: "Alex Rivera", email: "arivera@tech.co", role: "user", status: "active", joined: "2024-02-28" },
+                { id: "4", name: "James Wilson", email: "j.wilson@outlook.com", role: "user", status: "suspended", joined: "2024-03-05" },
+                { id: "5", name: "Elena Petrova", email: "elena@design.io", role: "user", status: "active", joined: "2024-03-12" },
+            ]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => { fetchUsers(); }, []);
+
+    const handleSuspend = async (userId: string, currentStatus: string) => {
+        const action = currentStatus === 'active' ? 'suspend' : 'reactivate';
+        try {
+            await apiFetch(`/admin/users/${userId}/${action}`, { method: 'POST' });
+            setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, status: action === 'suspend' ? 'suspended' : 'active' } : u));
+            toast.success(`User ${action}d successfully.`);
+        } catch {
+            toast.error(`Failed to ${action} user.`);
+        }
+    };
+
+    const handleRoleChange = async (userId: string, newRole: string) => {
+        try {
+            await apiFetch(`/admin/users/${userId}/role`, { method: 'PATCH', body: JSON.stringify({ role: newRole }) });
+            setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, role: newRole } : u));
+            toast.success(`Role updated to ${newRole}.`);
+        } catch {
+            toast.error("Failed to update role.");
+        }
+    };
 
     const filteredUsers = users.filter(user => 
         user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -215,20 +232,20 @@ export default function UserManagementPage() {
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end" className="bg-popover/90 backdrop-blur-md border-border/40">
                                                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                        <DropdownMenuItem className="gap-2">
+                                                        <DropdownMenuItem className="gap-2" onClick={() => window.open(`mailto:${user.email}`)}>
                                                             <Mail className="w-4 h-4" /> Email User
                                                         </DropdownMenuItem>
-                                                        <DropdownMenuItem className="gap-2">
-                                                            <Shield className="w-4 h-4" /> Change Role
+                                                        <DropdownMenuItem className="gap-2" onClick={() => handleRoleChange(user.id, user.role === 'user' ? 'moderator' : 'user')}>
+                                                            <Shield className="w-4 h-4" /> {user.role === 'user' ? 'Make Moderator' : 'Remove Moderator'}
                                                         </DropdownMenuItem>
                                                         <DropdownMenuSeparator className="bg-border/40" />
                                                         {user.status === 'active' ? (
-                                                            <DropdownMenuItem className="gap-2 text-red-400 focus:text-red-300">
+                                                            <DropdownMenuItem className="gap-2 text-red-400 focus:text-red-300" onClick={() => handleSuspend(user.id, 'active')}>
                                                                 <XCircle className="w-4 h-4" /> Suspend Account
                                                             </DropdownMenuItem>
                                                         ) : (
-                                                            <DropdownMenuItem className="gap-2 text-green-400 focus:text-green-300">
-                                                                <CheckCircle2 className="w-4 h-4" /> Reactive Account
+                                                            <DropdownMenuItem className="gap-2 text-green-400 focus:text-green-300" onClick={() => handleSuspend(user.id, 'suspended')}>
+                                                                <CheckCircle2 className="w-4 h-4" /> Reactivate Account
                                                             </DropdownMenuItem>
                                                         )}
                                                     </DropdownMenuContent>
