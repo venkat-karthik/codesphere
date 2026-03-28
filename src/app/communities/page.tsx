@@ -59,17 +59,15 @@ export default function CommunitiesPage() {
   const toggleJoin = async (id: string, currentlyJoined: boolean) => {
     try {
       if (currentlyJoined) {
-        // Leave logic could be added here
-        toast.info("Leaving community...");
+        await apiFetch(`/communities/${id}/leave`, { method: 'POST' });
+        toast.info("Left community.");
       } else {
         await apiFetch(`/communities/${id}/join`, { method: 'POST' });
         toast.success("Joined community!");
-        // Refresh communities to update member count/joined status
-        const data = await apiFetch('/communities');
-        setCommunities(data);
       }
-    } catch (error) {
-      toast.error("Failed to update membership");
+      setCommunities((prev) => prev.map((c) => (c._id === id || c.id === id) ? { ...c, joined: !currentlyJoined } : c));
+    } catch {
+      toast.error("Failed to update membership.");
     }
   };
 
