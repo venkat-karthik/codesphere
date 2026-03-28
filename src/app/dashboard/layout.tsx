@@ -1,7 +1,8 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Code2,
   LayoutDashboard,
@@ -19,9 +20,14 @@ import {
   LogOut,
   Shield,
   CreditCard,
+  Menu,
+  X,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { apiFetch } from "@/lib/api";
+import { toast } from "sonner";
 
 const navGroups = [
   {
@@ -60,88 +66,149 @@ const navGroups = [
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [user, setUser] = useState<any>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  return (
-    <div className="flex h-screen bg-background overflow-hidden">
-      {/* Sidebar */}
-      <aside className="w-64 flex-shrink-0 flex flex-col border-r border-sidebar-border bg-sidebar overflow-y-auto">
-        {/* Logo */}
-        <div className="p-5 border-b border-sidebar-border">
-          <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg animated-border p-[1.5px]">
-              <div className="w-full h-full rounded-[6px] bg-sidebar flex items-center justify-center">
-                <Code2 className="w-4 h-4 text-primary" />
-              </div>
-            </div>
-            <span className="font-bold text-lg gradient-text">CodeSphere</span>
-          </Link>
-        </div>
+  useEffect(() => {
+    apiFetch("/users/me").then(setUser).catch(() => {});
+  }, []);
 
-        {/* User info */}
-        <div className="p-4 border-b border-sidebar-border">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold text-sm shrink-0">
-              PS
+  const handleLogout = () => {
+    document.cookie = "auth-token=; path=/; max-age=0";
+    document.cookie = "admin-verified=; path=/; max-age=0";
+    toast.success("Signed out successfully");
+    router.push("/login");
+  };
+
+  const initials = user?.name
+    ? user.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
+    : "CS";
+
+  const SidebarContent = () => (
+    <>
+      {/* Logo */}
+      <div className="p-5 border-b border-sidebar-border">
+        <Link href="/" className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg animated-border p-[1.5px]">
+            <div className="w-full h-full rounded-[6px] bg-sidebar flex items-center justify-center">
+              <Code2 className="w-4 h-4 text-primary" />
             </div>
-            <div className="min-w-0">
-              <div className="font-medium text-sm text-sidebar-foreground truncate">Priya Sharma</div>
-              <div className="flex items-center gap-1 mt-0.5">
-                <Badge className="badge-gradient text-[10px] px-1.5 py-0 h-4">Standard</Badge>
-              </div>
+          </div>
+          <span className="font-bold text-lg gradient-text">CodeSphere</span>
+        </Link>
+      </div>
+
+      {/* User info */}
+      <div className="p-4 border-b border-sidebar-border">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold text-sm shrink-0">
+            {initials}
+          </div>
+          <div className="min-w-0">
+            <div className="font-medium text-sm text-sidebar-foreground truncate">
+              {user?.name || "Loading..."}
+            </div>
+            <div className="flex items-center gap-1 mt-0.5">
+              <Badge className="badge-gradient text-[10px] px-1.5 py-0 h-4">
+                {user?.plan || "Free"}
+              </Badge>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Nav groups */}
-        <nav className="flex-1 p-3 space-y-5">
-          {navGroups.map((group) => (
-            <div key={group.label}>
-              <div className="text-[10px] uppercase tracking-widest text-sidebar-foreground/40 px-2 mb-1.5 font-medium">
-                {group.label}
-              </div>
-              <ul className="space-y-0.5">
-                {group.items.map((item) => {
-                  const active = pathname === item.href || (item.href !== "/dashboard" && pathname?.startsWith(item.href));
-                  return (
-                    <li key={item.href}>
-                      <Link
-                        href={item.href}
-                        className={cn(
-                          "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors group",
-                          active
-                            ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                            : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
-                        )}
-                      >
-                        <item.icon className={cn("w-4 h-4 shrink-0", active ? "text-primary" : "")} />
-                        <span className="flex-1 truncate">{item.label}</span>
-                        {item.badge && (
-                          <Badge className="bg-primary/20 text-primary border-primary/30 text-[10px] px-1.5 py-0 h-4">
-                            {item.badge}
-                          </Badge>
-                        )}
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
+      {/* Nav groups */}
+      <nav className="flex-1 p-3 space-y-5">
+        {navGroups.map((group) => (
+          <div key={group.label}>
+            <div className="text-[10px] uppercase tracking-widest text-sidebar-foreground/40 px-2 mb-1.5 font-medium">
+              {group.label}
             </div>
-          ))}
-        </nav>
+            <ul className="space-y-0.5">
+              {group.items.map((item) => {
+                const active = pathname === item.href || (item.href !== "/dashboard" && pathname?.startsWith(item.href));
+                return (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      onClick={() => setSidebarOpen(false)}
+                      className={cn(
+                        "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors group",
+                        active
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                          : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+                      )}
+                    >
+                      <item.icon className={cn("w-4 h-4 shrink-0", active ? "text-primary" : "")} />
+                      <span className="flex-1 truncate">{item.label}</span>
+                      {item.badge && (
+                        <Badge className="bg-primary/20 text-primary border-primary/30 text-[10px] px-1.5 py-0 h-4">
+                          {item.badge}
+                        </Badge>
+                      )}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
+      </nav>
 
-        {/* Admin link + sign out */}
-        <div className="p-3 border-t border-sidebar-border space-y-1">
-          <Link href="/admin" className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors">
-            <Shield className="w-4 h-4" /> Admin Panel
-          </Link>
-          <Link href="/" className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-sidebar-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-colors">
-            <LogOut className="w-4 h-4" /> Sign Out
-          </Link>
-        </div>
+      {/* Admin link + sign out */}
+      <div className="p-3 border-t border-sidebar-border space-y-1">
+        <Link href="/admin" className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors">
+          <Shield className="w-4 h-4" /> Admin Panel
+        </Link>
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-sidebar-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-colors"
+        >
+          <LogOut className="w-4 h-4" /> Sign Out
+        </button>
+      </div>
+    </>
+  );
+
+  return (
+    <div className="flex h-screen bg-background overflow-hidden">
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Mobile sidebar */}
+      <aside className={cn(
+        "fixed inset-y-0 left-0 z-50 w-64 flex flex-col border-r border-sidebar-border bg-sidebar overflow-y-auto transition-transform duration-200 md:hidden",
+        sidebarOpen ? "translate-x-0" : "-translate-x-full"
+      )}>
+        <button
+          onClick={() => setSidebarOpen(false)}
+          className="absolute top-4 right-4 p-1 rounded-md hover:bg-accent/50"
+        >
+          <X className="w-4 h-4" />
+        </button>
+        <SidebarContent />
+      </aside>
+
+      {/* Desktop sidebar */}
+      <aside className="hidden md:flex w-64 flex-shrink-0 flex-col border-r border-sidebar-border bg-sidebar overflow-y-auto">
+        <SidebarContent />
       </aside>
 
       {/* Main content */}
       <main className="flex-1 overflow-y-auto">
+        {/* Mobile header */}
+        <div className="md:hidden flex items-center gap-3 p-4 border-b border-border/40 bg-background sticky top-0 z-30">
+          <Button variant="ghost" size="icon" className="w-8 h-8" onClick={() => setSidebarOpen(true)}>
+            <Menu className="w-4 h-4" />
+          </Button>
+          <span className="font-bold gradient-text">CodeSphere</span>
+        </div>
         {children}
       </main>
     </div>
