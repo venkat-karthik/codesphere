@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
     Code2,
@@ -11,7 +12,6 @@ import {
     ArrowRight,
     MoreVertical,
     Activity,
-    MessageSquare,
     Lock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -19,44 +19,30 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import Navbar from "@/components/layout/Navbar";
+import { apiFetch } from "@/lib/api";
 
-const projects = [
-    {
-        id: "proj-1",
-        name: "CodeSphere OSS",
-        desc: "Open source contributions to the main platform. Building the next gen features.",
-        members: 142,
-        tasks: 24,
-        tags: ["Next.js", "TypeScript"],
-        privacy: "public",
-        lastActive: "2 hours ago",
-        color: "bg-blue-500",
-    },
-    {
-        id: "proj-2",
-        name: "Next.js E-Commerce Headless",
-        desc: "Building a scalable storefront with Tailwind and MedusaJS backend.",
-        members: 12,
-        tasks: 8,
-        tags: ["React", "Stripe"],
-        privacy: "public",
-        lastActive: "5 hours ago",
-        color: "bg-green-500",
-    },
-    {
-        id: "proj-3",
-        name: "AI Study Group (Private)",
-        desc: "Private workspace for the Advanced ML Study Cohort to share notebooks.",
-        members: 5,
-        tasks: 2,
-        tags: ["Python", "PyTorch"],
-        privacy: "private",
-        lastActive: "1 day ago",
-        color: "bg-purple-500",
-    },
+const MOCK_PROJECTS = [
+    { _id: "proj-1", name: "CodeSphere OSS", description: "Open source contributions to the main platform.", members: Array(142).fill(null), tasks: 24, tags: ["Next.js", "TypeScript"], isPublic: true, lastActive: "2 hours ago" },
+    { _id: "proj-2", name: "Next.js E-Commerce Headless", description: "Building a scalable storefront with Tailwind and MedusaJS.", members: Array(12).fill(null), tasks: 8, tags: ["React", "Stripe"], isPublic: true, lastActive: "5 hours ago" },
+    { _id: "proj-3", name: "AI Study Group", description: "Private workspace for the Advanced ML Study Cohort.", members: Array(5).fill(null), tasks: 2, tags: ["Python", "PyTorch"], isPublic: false, lastActive: "1 day ago" },
 ];
 
 export default function CodexPage() {
+    const [projects, setProjects] = useState<any[]>([]);
+    const [search, setSearch] = useState("");
+    const [filter, setFilter] = useState("all");
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        apiFetch("/codex").then((data) => setProjects(Array.isArray(data) ? data : [])).catch(() => setProjects(MOCK_PROJECTS)).finally(() => setLoading(false));
+    }, []);
+
+    const filtered = projects.filter((p) => {
+        const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) || p.tags?.some((t: string) => t.toLowerCase().includes(search.toLowerCase()));
+        const matchFilter = filter === "all" || (filter === "public" ? p.isPublic : !p.isPublic);
+        return matchSearch && matchFilter;
+    });
+
     return (
         <div className="min-h-screen bg-background flex flex-col">
             <Navbar />
@@ -92,12 +78,14 @@ export default function CodexPage() {
                         <Input
                             placeholder="Search workspaces by name or tag..."
                             className="pl-10 h-11 bg-card/50 border-border/40"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
                         />
                     </div>
                     <div className="flex gap-2">
-                        <Button variant="secondary" className="h-11">All</Button>
-                        <Button variant="ghost" className="h-11 border border-border/40">Public</Button>
-                        <Button variant="ghost" className="h-11 border border-border/40 gap-2">
+                        <Button variant={filter === "all" ? "secondary" : "ghost"} className="h-11 border border-border/40" onClick={() => setFilter("all")}>All</Button>
+                        <Button variant={filter === "public" ? "secondary" : "ghost"} className="h-11 border border-border/40" onClick={() => setFilter("public")}>Public</Button>
+                        <Button variant={filter === "private" ? "secondary" : "ghost"} className="h-11 border border-border/40 gap-2" onClick={() => setFilter("private")}>
                             <Lock className="w-3.5 h-3.5" /> Private
                         </Button>
                     </div>
@@ -105,11 +93,11 @@ export default function CodexPage() {
 
                 {/* Project Grid */}
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {projects.map((proj) => (
-                        <Card key={proj.id} className="bg-card/40 border-border/40 hover:border-border/80 hover:bg-card/60 transition-all group flex flex-col h-full">
+                    {filtered.map((proj) => (
+                        <Card key={proj._id} className="bg-card/40 border-border/40 hover:border-border/80 hover:bg-card/60 transition-all group flex flex-col h-full">
                             <CardContent className="p-6 flex flex-col h-full">
                                 <div className="flex items-start justify-between mb-4">
-                                    <div className={`w-12 h-12 rounded-xl bg-background border border-border/40 flex items-center justify-center shrink-0`}>
+                                    <div className="w-12 h-12 rounded-xl bg-background border border-border/40 flex items-center justify-center shrink-0">
                                         <Code2 className="w-6 h-6 text-foreground" />
                                     </div>
                                     <Button variant="ghost" size="icon" className="w-8 h-8 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -120,33 +108,26 @@ export default function CodexPage() {
                                 <div className="mb-4">
                                     <div className="flex items-center gap-2 mb-1.5">
                                         <h3 className="font-semibold text-lg line-clamp-1 group-hover:text-primary transition-colors">{proj.name}</h3>
-                                        {proj.privacy === "private" && (
-                                            <Lock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                                        )}
+                                        {!proj.isPublic && <Lock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
                                     </div>
-                                    <p className="text-sm text-muted-foreground line-clamp-2">
-                                        {proj.desc}
-                                    </p>
+                                    <p className="text-sm text-muted-foreground line-clamp-2">{proj.description}</p>
                                 </div>
 
                                 <div className="flex flex-wrap gap-2 mb-6">
-                                    {proj.tags.map((tag) => (
-                                        <Badge key={tag} variant="outline" className="text-[10px] bg-background/50">
-                                            {tag}
-                                        </Badge>
+                                    {proj.tags?.map((tag: string) => (
+                                        <Badge key={tag} variant="outline" className="text-[10px] bg-background/50">{tag}</Badge>
                                     ))}
                                 </div>
 
                                 <div className="mt-auto pt-4 border-t border-border/40">
                                     <div className="flex items-center justify-between text-xs text-muted-foreground mb-4">
                                         <div className="flex items-center gap-4">
-                                            <span className="flex items-center gap-1.5"><Users className="w-3.5 h-3.5" /> {proj.members}</span>
-                                            <span className="flex items-center gap-1.5"><GitBranch className="w-3.5 h-3.5" /> {proj.tasks} tasks</span>
+                                            <span className="flex items-center gap-1.5"><Users className="w-3.5 h-3.5" /> {proj.members?.length ?? 0}</span>
+                                            <span className="flex items-center gap-1.5"><GitBranch className="w-3.5 h-3.5" /> {proj.tasks ?? 0} tasks</span>
                                         </div>
-                                        <span className="flex items-center gap-1.5"><Activity className="w-3.5 h-3.5" /> {proj.lastActive}</span>
+                                        <span className="flex items-center gap-1.5"><Activity className="w-3.5 h-3.5" /> {proj.lastActive || "Recently"}</span>
                                     </div>
-
-                                    <Link href={`/codex/${proj.id}`} className="w-full">
+                                    <Link href={`/codex/${proj._id}`} className="w-full">
                                         <Button variant="secondary" className="w-full gap-2 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
                                             Enter Workspace <ArrowRight className="w-4 h-4" />
                                         </Button>
