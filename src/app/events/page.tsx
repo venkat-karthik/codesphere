@@ -207,7 +207,7 @@ export default function EventsPage() {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
             {filtered.map((e) => {
-              const cfg = statusConfig.upcoming;
+              const cfg = statusConfig[(e.status as keyof typeof statusConfig)] || statusConfig.upcoming;
               return (
                 <Card key={e._id} className="border-border/40 bg-card/50 card-hover group overflow-hidden">
                   <CardContent className="p-5">
