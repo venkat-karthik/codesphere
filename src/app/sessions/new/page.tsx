@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect } from "react";
 import { ArrowLeft, Video, Calendar, Loader2, Users } from "lucide-react";
 import Link from "next/link";
