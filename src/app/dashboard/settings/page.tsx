@@ -1,13 +1,48 @@
 "use client";
 
+import { useState, useEffect, useRef } from "react";
 import { User, Mail, Shield, Bell, Key, Globe, LayoutDashboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
+import { apiFetch } from "@/lib/api";
 
 export default function SettingsPage() {
+    const [user, setUser] = useState<any>(null);
+    const [saving, setSaving] = useState(false);
+    const [form, setForm] = useState({ name: "", username: "", bio: "", website: "" });
+    const fileRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        apiFetch("/users/me").then((data) => {
+            setUser(data);
+            setForm({
+                name: data.name || "",
+                username: data.username || data.email?.split("@")[0] || "",
+                bio: data.bio || "",
+                website: data.website || "",
+            });
+        }).catch(() => {});
+    }, []);
+
+    const handleSaveProfile = async () => {
+        setSaving(true);
+        try {
+            await apiFetch("/users/me", { method: "PATCH", body: JSON.stringify(form) });
+            toast.success("Profile changes saved successfully");
+        } catch {
+            toast.error("Failed to save profile. Please try again.");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const initials = form.name
+        ? form.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
+        : "CS";
+
     return (
         <div className="p-6 md:p-8 max-w-4xl mx-auto w-full space-y-8">
             <div>
@@ -51,11 +86,12 @@ export default function SettingsPage() {
 
                         <div className="flex items-center gap-6">
                             <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center text-primary text-2xl font-bold border-2 border-primary/20 shrink-0">
-                                PS
+                                {initials}
                             </div>
                             <div>
                                 <div className="flex gap-2">
-                                    <Button variant="outline" size="sm" className="h-9" onClick={() => toast.info("Opening file uploader...")}>Change Avatar</Button>
+                                    <Button variant="outline" size="sm" className="h-9" onClick={() => fileRef.current?.click()}>Change Avatar</Button>
+                                    <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={() => toast.info("Avatar upload requires backend storage integration.")} />
                                     <Button variant="ghost" size="sm" className="h-9 text-muted-foreground hover:text-destructive" onClick={() => toast.success("Avatar removed")}>Remove</Button>
                                 </div>
                                 <p className="text-[11px] text-muted-foreground mt-2">JPG, GIF or PNG. Max size of 800K</p>
@@ -65,11 +101,11 @@ export default function SettingsPage() {
                         <div className="grid gap-6 sm:grid-cols-2">
                             <div className="space-y-2">
                                 <Label htmlFor="name">Full Name</Label>
-                                <Input id="name" defaultValue="Priya Sharma" className="bg-muted/30" />
+                                <Input id="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="bg-muted/30" />
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="handle">Username</Label>
-                                <Input id="handle" defaultValue="@priyasharma" className="bg-muted/30" />
+                                <Input id="handle" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} className="bg-muted/30" />
                             </div>
                         </div>
 
@@ -79,7 +115,9 @@ export default function SettingsPage() {
                                 id="bio"
                                 rows={4}
                                 className="w-full rounded-md border border-input bg-muted/30 px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none font-sans"
-                                defaultValue="Full Stack Developer passionate about React, Next.js, and building accessible web applications. Learning something new every day."
+                                value={form.bio}
+                                onChange={(e) => setForm({ ...form, bio: e.target.value })}
+                                placeholder="Brief description for your profile."
                             />
                             <p className="text-xs text-muted-foreground">Brief description for your profile. URLs are hyperlinked.</p>
                         </div>
@@ -88,11 +126,14 @@ export default function SettingsPage() {
                             <Label htmlFor="website">Website / Portfolio</Label>
                             <div className="relative">
                                 <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                                <Input id="website" defaultValue="https://priyasharma.dev" className="pl-9 bg-muted/30" />
+                                <Input id="website" value={form.website} onChange={(e) => setForm({ ...form, website: e.target.value })} className="pl-9 bg-muted/30" placeholder="https://yoursite.dev" />
                             </div>
                         </div>
 
-                        <Button className="gap-2" onClick={() => toast.success("Profile changes saved successfully")}>Save Profile Changes</Button>
+                        <Button className="gap-2" onClick={handleSaveProfile} disabled={saving}>
+                            {saving ? <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : null}
+                            Save Profile Changes
+                        </Button>
                     </section>
 
                     {/* Account Security Section */}
