@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -23,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { apiFetch } from "@/lib/api";
 
 const recentPaths = [
   { title: "Full Stack Web Dev", progress: 65, topic: "Web", color: "bg-blue-500/20 text-blue-400" },
@@ -54,12 +56,27 @@ const upcomingEvents = [
 ];
 
 export default function DashboardPage() {
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    apiFetch("/users/me").then(setUser).catch(() => {});
+  }, []);
+
+  const greeting = () => {
+    const h = new Date().getHours();
+    if (h < 12) return "Good morning";
+    if (h < 18) return "Good afternoon";
+    return "Good evening";
+  };
+
+  const firstName = user?.name?.split(" ")[0] || "there";
+
   return (
     <div className="p-6 max-w-6xl mx-auto">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-2xl font-bold">Good evening, Priya 👋</h1>
+          <h1 className="text-2xl font-bold">{greeting()}, {firstName} 👋</h1>
           <p className="text-muted-foreground text-sm mt-1">You have 3 unread notifications and 1 live session happening now.</p>
         </div>
         <div className="flex items-center gap-2">
