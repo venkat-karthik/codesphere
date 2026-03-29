@@ -63,7 +63,19 @@ export default function ProfilePage() {
         followers: user?.followers ?? 1200,
     };
 
-    const [activeTab, setActiveTab] = useState("overview");
+    const [following, setFollowing] = useState(false);
+
+    const handleFollow = async () => {
+        const wasFollowing = following;
+        setFollowing(!wasFollowing);
+        try {
+            await apiFetch(`/users/${user?._id || user?.id}/follow`, { method: wasFollowing ? "DELETE" : "POST" });
+            toast.success(wasFollowing ? "Unfollowed." : `You are now following ${profile.name}`);
+        } catch {
+            setFollowing(wasFollowing);
+            toast.error("Failed to update follow status.");
+        }
+    };
 
     return (
         <div className="min-h-screen bg-background flex flex-col">
@@ -83,7 +95,9 @@ export default function ProfilePage() {
                             </div>
                             <div className="flex gap-2">
                                 <Button variant="outline" onClick={() => toast.info("Direct messaging coming soon")}>Message</Button>
-                                <Button className="bg-primary text-primary-foreground" onClick={() => toast.success(`You are now following ${profile.name}`)}>Follow</Button>
+                                <Button className="bg-primary text-primary-foreground" onClick={handleFollow}>
+                                    {following ? "Unfollow" : "Follow"}
+                                </Button>
                             </div>
                         </div>
 
