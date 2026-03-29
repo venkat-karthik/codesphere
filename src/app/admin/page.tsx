@@ -23,6 +23,11 @@ import { apiFetch } from "@/lib/api";
 export default function AdminDashboardPage() {
     const [statsData, setStatsData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [modQueue, setModQueue] = useState([
+        { id: "REP-1042", user: "JohnDoe", reason: "Spam content in community", status: "pending", time: "10 mins ago" },
+        { id: "REP-1043", user: "CryptoBot", reason: "Phishing links", status: "pending", time: "25 mins ago" },
+        { id: "REP-1044", user: "AngryDev", reason: "Harassment", status: "pending", time: "1 hour ago" },
+    ]);
 
     useEffect(() => {
         const fetchStats = async () => {
@@ -83,11 +88,12 @@ export default function AdminDashboardPage() {
         },
     ];
 
-    const moderationQueue = [
-        { id: "REP-1042", user: "JohnDoe", reason: "Spam content in community", status: "pending", time: "10 mins ago" },
-        { id: "REP-1043", user: "CryptoBot", reason: "Phishing links", status: "pending", time: "25 mins ago" },
-        { id: "REP-1044", user: "AngryDev", reason: "Harassment", status: "pending", time: "1 hour ago" },
-    ];
+    const handleModAction = async (id: string, action: "approve" | "reject") => {
+        setModQueue((prev) => prev.filter((item) => item.id !== id));
+        try { await apiFetch(`/admin/reports/${id}/${action}`, { method: "POST" }); } catch { /* silent */ }
+    };
+
+    const moderationQueue = modQueue;
 
     if (loading) {
         return (
@@ -109,10 +115,10 @@ export default function AdminDashboardPage() {
                     </p>
                 </div>
                 <div className="flex gap-3">
-                    <Button variant="outline" className="gap-2">
+                    <Button variant="outline" className="gap-2" onClick={() => window.print()}>
                         Download Report
                     </Button>
-                    <Button className="gap-2">
+                    <Button className="gap-2" onClick={() => window.location.href = "/admin/settings"}>
                         System Settings
                     </Button>
                 </div>
@@ -168,10 +174,10 @@ export default function AdminDashboardPage() {
                                     <div className="flex items-center gap-3">
                                         <span className="text-xs text-muted-foreground">{item.time}</span>
                                         <div className="flex gap-1 h-8">
-                                            <Button variant="ghost" size="icon" className="w-8 h-8 text-green-400 hover:text-green-300 hover:bg-green-500/20">
+                                            <Button variant="ghost" size="icon" className="w-8 h-8 text-green-400 hover:text-green-300 hover:bg-green-500/20" onClick={() => handleModAction(item.id, "approve")}>
                                                 <CheckCircle2 className="w-4 h-4" />
                                             </Button>
-                                            <Button variant="ghost" size="icon" className="w-8 h-8 text-red-400 hover:text-red-300 hover:bg-red-500/20">
+                                            <Button variant="ghost" size="icon" className="w-8 h-8 text-red-400 hover:text-red-300 hover:bg-red-500/20" onClick={() => handleModAction(item.id, "reject")}>
                                                 <XCircle className="w-4 h-4" />
                                             </Button>
                                         </div>
