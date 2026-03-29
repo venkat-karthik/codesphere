@@ -58,22 +58,35 @@ const upcomingEvents = [
 export default function DashboardPage() {
   const [user, setUser] = useState<any>(null);
   const [stats, setStats] = useState({ paths: 0, resources: 0, streak: 0, achievements: 0 });
+  const [dashData, setDashData] = useState<any>(null);
 
   useEffect(() => {
-    apiFetch("/users/me").then((data) => {
-      setUser(data);
+    const controller = new AbortController();
+    Promise.all([
+      apiFetch("/users/me", {}, controller.signal),
+      apiFetch("/users/me/dashboard", {}, controller.signal),
+    ]).then(([userData, dash]) => {
+      setUser(userData);
       setStats({
-        paths: data.activePaths ?? 3,
-        resources: data.savedResources ?? 24,
-        streak: data.streak ?? 12,
-        achievements: data.achievements?.length ?? 7,
+        paths: userData.activePaths ?? 3,
+        resources: userData.savedResources ?? 24,
+        streak: userData.streak ?? 12,
+        achievements: userData.achievements?.length ?? 7,
       });
+      setDashData(dash);
     }).catch(() => {
       setStats({ paths: 3, resources: 24, streak: 12, achievements: 7 });
     });
+    return () => controller.abort();
   }, []);
 
-  const greeting = () => {
+  const paths = dashData?.recentPaths ?? recentPaths;
+  const sessions = dashData?.upcomingSessions ?? upcomingSessions;
+  const communities = dashData?.joinedCommunities ?? joinedCommunities;
+  const resources = dashData?.savedResources ?? savedResources;
+  const events = dashData?.upcomingEvents ?? upcomingEvents;
+  const unreadCount = dashData?.unreadNotifications ?? 3;
+  const plan = user?.plan ?? "Standard";
     const h = new Date().getHours();
     if (h < 12) return "Good morning";
     if (h < 18) return "Good afternoon";
@@ -88,14 +101,17 @@ export default function DashboardPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-bold">{greeting()}, {firstName} 👋</h1>
-          <p className="text-muted-foreground text-sm mt-1">You have 3 unread notifications and 1 live session happening now.</p>
+          <p className="text-muted-foreground text-sm mt-1">
+            {unreadCount > 0 ? `You have ${unreadCount} unread notification${unreadCount > 1 ? "s" : ""}` : "You're all caught up!"}{" "}
+            {sessions.some((s: any) => s.live) ? "and 1 live session happening now." : ""}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Link href="/dashboard/notifications">
             <Button variant="outline" size="sm" className="gap-1.5 relative">
               <Bell className="w-4 h-4" />
               Notifications
-              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[10px] flex items-center justify-center">3</span>
+              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[10px] flex items-center justify-center">{unreadCount}</span>
             </Button>
           </Link>
           <Link href="/pricing">
@@ -141,7 +157,7 @@ export default function DashboardPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              {recentPaths.map((path) => (
+              {paths.map((path: any) => (
                 <div key={path.title} className="group">
                   <div className="flex items-center justify-between mb-1.5">
                     <div className="flex items-center gap-2">
@@ -174,7 +190,7 @@ export default function DashboardPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              {upcomingSessions.map((s) => (
+              {sessions.map((s: any) => (
                 <div key={s.title} className="flex items-center gap-3 p-3 rounded-lg border border-border/40 hover:border-border/80 transition-colors cursor-pointer group">
                   <div className={`w-2 h-2 rounded-full shrink-0 ${s.live ? "bg-red-400 animate-pulse" : "bg-green-400"}`} />
                   <div className="flex-1 min-w-0">
@@ -202,7 +218,7 @@ export default function DashboardPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              {savedResources.map((r) => (
+              {resources.map((r: any) => (
                 <div key={r.title} className="flex items-center gap-3 group cursor-pointer">
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-xs font-semibold ${r.type === "PDF" ? "bg-red-500/20 text-red-400" :
                     r.type === "Video" ? "bg-purple-500/20 text-purple-400" :
@@ -227,7 +243,7 @@ export default function DashboardPage() {
           <Card className="border-primary/30 bg-primary/5">
             <CardContent className="p-5">
               <div className="flex items-center gap-2 mb-3">
-                <Badge className="badge-gradient text-xs">Standard Plan</Badge>
+                <Badge className="badge-gradient text-xs">{plan} Plan</Badge>
               </div>
               <p className="text-sm text-muted-foreground mb-4">
                 Unlock AI roadmaps, private Codex projects, and premium tutorials with Premium.
@@ -252,7 +268,7 @@ export default function DashboardPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-2.5">
-              {joinedCommunities.map((c) => (
+              {communities.map((c: any) => (
                 <div key={c.name} className="flex items-center gap-2.5 p-2.5 rounded-lg hover:bg-accent/30 transition-colors cursor-pointer">
                   <div className={`w-8 h-8 rounded-lg ${c.color} flex items-center justify-center text-xs font-bold`}>
                     {c.name.slice(0, 2).toUpperCase()}
@@ -282,7 +298,7 @@ export default function DashboardPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-2.5">
-              {upcomingEvents.map((e) => (
+              {events.map((e: any) => (
                 <div key={e.title} className="flex items-center gap-2.5 p-2.5 rounded-lg hover:bg-accent/30 transition-colors cursor-pointer">
                   <div className={`w-2 h-2 rounded-full shrink-0 ${e.color} ${(e as any).live ? "animate-pulse" : ""}`} />
                   <div className="flex-1 min-w-0">
