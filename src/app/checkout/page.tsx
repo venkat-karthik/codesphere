@@ -24,20 +24,27 @@ function CheckoutContent() {
 
     const [isProcessing, setIsProcessing] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
+    const [cardName, setCardName] = useState("");
+    const [cardNumber, setCardNumber] = useState("");
+    const [expiry, setExpiry] = useState("");
+    const [cvv, setCvv] = useState("");
 
     const planDetails = {
-        standard: { name: "Standard", price: "₹50", period: "/month" },
-        premium: { name: "Premium", price: "₹100", period: "/month" },
-    }[plan as "standard" | "premium"] || { name: "Standard", price: "₹50", period: "/month" };
+        standard: { name: "Standard", basePrice: 50 },
+        premium: { name: "Premium", basePrice: 100 },
+    }[plan as "standard" | "premium"] || { name: "Standard", basePrice: 50 };
 
-    const handlePayment = (e: React.FormEvent) => {
+    const gst = Math.round(planDetails.basePrice * 0.18);
+    const total = planDetails.basePrice + gst;
+
+    const handlePayment = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!cardName || !cardNumber || !expiry || !cvv) return;
         setIsProcessing(true);
-        // Simulate Razorpay processing
-        setTimeout(() => {
-            setIsProcessing(false);
-            setIsSuccess(true);
-        }, 2000);
+        // Razorpay integration point — simulate for now
+        await new Promise((r) => setTimeout(r, 2000));
+        setIsProcessing(false);
+        setIsSuccess(true);
     };
 
     if (isSuccess) {
@@ -80,23 +87,23 @@ function CheckoutContent() {
                                         <CreditCard className="w-5 h-5 text-primary" /> Payment Method
                                     </h2>
 
-                                    <div className="space-y-4">
+                        <div className="space-y-4">
                                         <div className="grid gap-2">
                                             <Label htmlFor="name">Name on Card</Label>
-                                            <Input id="name" placeholder="John Doe" required className="bg-background" />
+                                            <Input id="name" placeholder="John Doe" required className="bg-background" value={cardName} onChange={(e) => setCardName(e.target.value)} />
                                         </div>
                                         <div className="grid gap-2">
                                             <Label htmlFor="card">Card Number</Label>
-                                            <Input id="card" placeholder="0000 0000 0000 0000" required className="bg-background font-mono" />
+                                            <Input id="card" placeholder="0000 0000 0000 0000" required className="bg-background font-mono" maxLength={19} value={cardNumber} onChange={(e) => setCardNumber(e.target.value.replace(/\D/g, "").replace(/(.{4})/g, "$1 ").trim())} />
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="grid gap-2">
                                                 <Label htmlFor="expiry">Expiry Date</Label>
-                                                <Input id="expiry" placeholder="MM/YY" required className="bg-background" />
+                                                <Input id="expiry" placeholder="MM/YY" required className="bg-background" maxLength={5} value={expiry} onChange={(e) => setExpiry(e.target.value)} />
                                             </div>
                                             <div className="grid gap-2">
                                                 <Label htmlFor="cvv">CVV</Label>
-                                                <Input id="cvv" placeholder="123" required className="bg-background" type="password" maxLength={4} />
+                                                <Input id="cvv" placeholder="123" required className="bg-background" type="password" maxLength={4} value={cvv} onChange={(e) => setCvv(e.target.value)} />
                                             </div>
                                         </div>
                                     </div>
@@ -108,7 +115,7 @@ function CheckoutContent() {
                                     <>Processing...</>
                                 ) : (
                                     <>
-                                        <Lock className="w-4 h-4" /> Pay {planDetails.price} securely
+                                        <Lock className="w-4 h-4" /> Pay ₹{total} securely
                                     </>
                                 )}
                             </Button>
@@ -136,24 +143,24 @@ function CheckoutContent() {
                                             <div className="text-xs text-muted-foreground">Monthly subscription</div>
                                         </div>
                                     </div>
-                                    <div className="font-semibold">{planDetails.price}</div>
+                                    <div className="font-semibold">₹{planDetails.basePrice}</div>
                                 </div>
 
                                 <div className="space-y-3 text-sm mb-6 pb-6 border-b border-border/40">
                                     <div className="flex justify-between text-muted-foreground">
                                         <span>Subtotal</span>
-                                        <span className="text-foreground">{planDetails.price}</span>
+                                        <span className="text-foreground">₹{planDetails.basePrice}</span>
                                     </div>
                                     <div className="flex justify-between text-muted-foreground">
                                         <span>GST (18%)</span>
-                                        <span className="text-foreground">Calculated next step</span>
+                                        <span className="text-foreground">₹{gst}</span>
                                     </div>
                                 </div>
 
                                 <div className="flex justify-between items-end mb-8">
                                     <span className="font-semibold">Total Due</span>
                                     <div className="text-right">
-                                        <span className="text-2xl font-bold">{planDetails.price}</span>
+                                        <span className="text-2xl font-bold">₹{total}</span>
                                         <div className="text-xs text-muted-foreground">includes all taxes</div>
                                     </div>
                                 </div>
