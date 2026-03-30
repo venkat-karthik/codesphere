@@ -12,7 +12,8 @@ import {
     Calendar,
     CheckCircle2,
     XCircle,
-    BadgeCheck
+    BadgeCheck,
+    GraduationCap,
 } from "lucide-react";
 import { 
     Card, 
@@ -47,10 +48,11 @@ export default function UserManagementPage() {
         } catch {
             setUsers([
                 { id: "1", name: "Venkat Karthik", email: "venkat@codesphere.io", role: "admin", status: "active", joined: "2024-01-15" },
-                { id: "2", name: "Sarah Chen", email: "sarah.c@gmail.com", role: "moderator", status: "active", joined: "2024-02-10" },
-                { id: "3", name: "Alex Rivera", email: "arivera@tech.co", role: "user", status: "active", joined: "2024-02-28" },
-                { id: "4", name: "James Wilson", email: "j.wilson@outlook.com", role: "user", status: "suspended", joined: "2024-03-05" },
-                { id: "5", name: "Elena Petrova", email: "elena@design.io", role: "user", status: "active", joined: "2024-03-12" },
+                { id: "2", name: "Sarah Chen", email: "sarah.c@gmail.com", role: "instructor", status: "active", joined: "2024-02-10" },
+                { id: "3", name: "Alex Rivera", email: "arivera@tech.co", role: "student", status: "active", joined: "2024-02-28" },
+                { id: "4", name: "James Wilson", email: "j.wilson@outlook.com", role: "student", status: "suspended", joined: "2024-03-05" },
+                { id: "5", name: "Elena Petrova", email: "elena@design.io", role: "instructor", status: "active", joined: "2024-03-12" },
+                { id: "6", name: "Ravi Verma", email: "ravi@devops.io", role: "student", status: "active", joined: "2024-03-20" },
             ]);
         } finally {
             setLoading(false);
@@ -79,7 +81,6 @@ export default function UserManagementPage() {
             toast.error("Failed to update role.");
         }
     };
-
     const filteredUsers = users.filter(user => 
         user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         user.email?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -101,7 +102,7 @@ export default function UserManagementPage() {
             </div>
 
             {/* Quick Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <Card className="bg-card/40 border-border/40">
                     <CardContent className="p-6 flex items-center gap-4">
                         <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
@@ -109,7 +110,7 @@ export default function UserManagementPage() {
                         </div>
                         <div>
                             <div className="text-2xl font-bold">{users.length}</div>
-                            <div className="text-sm text-muted-foreground">Total Registered Users</div>
+                            <div className="text-sm text-muted-foreground">Total Users</div>
                         </div>
                     </CardContent>
                 </Card>
@@ -126,12 +127,23 @@ export default function UserManagementPage() {
                 </Card>
                 <Card className="bg-card/40 border-border/40">
                     <CardContent className="p-6 flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center text-green-500">
+                            <GraduationCap className="w-6 h-6" />
+                        </div>
+                        <div>
+                            <div className="text-2xl font-bold">{users.filter(u => u.role === 'instructor').length}</div>
+                            <div className="text-sm text-muted-foreground">Instructors</div>
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card className="bg-card/40 border-border/40">
+                    <CardContent className="p-6 flex items-center gap-4">
                         <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500">
                             <Shield className="w-6 h-6" />
                         </div>
                         <div>
-                            <div className="text-2xl font-bold">{users.filter(u => u.role !== 'user').length}</div>
-                            <div className="text-sm text-muted-foreground">Admins & Moderators</div>
+                            <div className="text-2xl font-bold">{users.filter(u => u.role === 'admin' || u.role === 'moderator').length}</div>
+                            <div className="text-sm text-muted-foreground">Admins & Mods</div>
                         </div>
                     </CardContent>
                 </Card>
@@ -205,12 +217,15 @@ export default function UserManagementPage() {
                                             <td className="p-4">
                                                 <Badge 
                                                     variant="secondary" 
-                                                    className={`capitalize font-medium ${
+                                                    className={`capitalize font-medium flex items-center gap-1 w-fit ${
                                                         user.role === 'admin' ? 'bg-primary/10 text-primary border-primary/20' : 
+                                                        user.role === 'instructor' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
                                                         user.role === 'moderator' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
                                                         'bg-slate-500/10 text-slate-400 border-slate-500/20'
                                                     }`}
                                                 >
+                                                    {user.role === 'admin' && <BadgeCheck className="w-3 h-3" />}
+                                                    {user.role === 'instructor' && <GraduationCap className="w-3 h-3" />}
                                                     {user.role}
                                                 </Badge>
                                             </td>
@@ -235,8 +250,18 @@ export default function UserManagementPage() {
                                                         <DropdownMenuItem className="gap-2" onClick={() => window.open(`mailto:${user.email}`)}>
                                                             <Mail className="w-4 h-4" /> Email User
                                                         </DropdownMenuItem>
-                                                        <DropdownMenuItem className="gap-2" onClick={() => handleRoleChange(user.id, user.role === 'user' ? 'moderator' : 'user')}>
-                                                            <Shield className="w-4 h-4" /> {user.role === 'user' ? 'Make Moderator' : 'Remove Moderator'}
+                                                        {user.role !== 'instructor' && user.role !== 'admin' && (
+                                                            <DropdownMenuItem className="gap-2 text-green-400 focus:text-green-300" onClick={() => handleRoleChange(user.id, 'instructor')}>
+                                                                <GraduationCap className="w-4 h-4" /> Promote to Instructor
+                                                            </DropdownMenuItem>
+                                                        )}
+                                                        {user.role === 'instructor' && (
+                                                            <DropdownMenuItem className="gap-2" onClick={() => handleRoleChange(user.id, 'student')}>
+                                                                <GraduationCap className="w-4 h-4" /> Remove Instructor Role
+                                                            </DropdownMenuItem>
+                                                        )}
+                                                        <DropdownMenuItem className="gap-2" onClick={() => handleRoleChange(user.id, user.role === 'moderator' ? 'student' : 'moderator')}>
+                                                            <Shield className="w-4 h-4" /> {user.role === 'moderator' ? 'Remove Moderator' : 'Make Moderator'}
                                                         </DropdownMenuItem>
                                                         <DropdownMenuSeparator className="bg-border/40" />
                                                         {user.status === 'active' ? (

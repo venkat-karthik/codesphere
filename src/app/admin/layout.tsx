@@ -15,6 +15,7 @@ import {
     ChevronRight,
     Menu,
     X,
+    GraduationCap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Navbar from "@/components/layout/Navbar";
@@ -23,6 +24,7 @@ import { cn } from "@/lib/utils";
 const sidebarLinks = [
     { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
     { href: "/admin/users", label: "User Management", icon: Users },
+    { href: "/admin/instructor-appeals", label: "Instructor Appeals", icon: GraduationCap },
     { href: "/admin/roles", label: "Roles & Permissions", icon: Shield },
     { href: "/admin/content", label: "Content Control", icon: FileText },
     { href: "/admin/events", label: "Events Manager", icon: Calendar },
