@@ -22,6 +22,7 @@ import {
   CreditCard,
   Menu,
   X,
+  GraduationCap,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -74,6 +75,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     apiFetch("/users/me").then(setUser).catch(() => {});
   }, []);
 
+  const role: string = user?.role ?? "student";
+  const isInstructor = role === "instructor" || role === "admin";
+  const isAdmin = role === "admin";
+
   const handleLogout = () => {
     document.cookie = "auth-token=; path=/; max-age=0";
     document.cookie = "admin-verified=; path=/; max-age=0";
@@ -113,6 +118,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <Badge className="badge-gradient text-[10px] px-1.5 py-0 h-4">
                 {user?.plan || "Free"}
               </Badge>
+              {role !== "student" && (
+                <Badge className={`text-[10px] px-1.5 py-0 h-4 capitalize ${role === "admin" ? "bg-primary/20 text-primary" : "bg-green-500/20 text-green-400"}`}>
+                  {role}
+                </Badge>
+              )}
             </div>
           </div>
         </div>
@@ -154,13 +164,53 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </ul>
           </div>
         ))}
+
+        {/* Instructor section — only shown to instructors/admins */}
+        {isInstructor && (
+          <div>
+            <div className="text-[10px] uppercase tracking-widest text-sidebar-foreground/40 px-2 mb-1.5 font-medium">
+              Instructor
+            </div>
+            <ul className="space-y-0.5">
+              {[
+                { label: "Instructor Dashboard", href: "/instructor", icon: GraduationCap },
+              ].map((item) => {
+                const active = pathname === item.href || pathname?.startsWith(item.href);
+                return (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      onClick={() => setSidebarOpen(false)}
+                      className={cn(
+                        "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors",
+                        active
+                          ? "bg-green-500/10 text-green-400 font-medium"
+                          : "text-sidebar-foreground/70 hover:text-green-400 hover:bg-green-500/10"
+                      )}
+                    >
+                      <item.icon className="w-4 h-4 shrink-0" />
+                      <span className="flex-1 truncate">{item.label}</span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
       </nav>
 
       {/* Admin link + sign out */}
       <div className="p-3 border-t border-sidebar-border space-y-1">
-        <Link href="/admin" className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors">
-          <Shield className="w-4 h-4" /> Admin Panel
-        </Link>
+        {!isInstructor && (
+          <Link href="/dashboard/become-instructor" onClick={() => setSidebarOpen(false)} className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-green-400/80 hover:text-green-400 hover:bg-green-500/10 transition-colors">
+            <GraduationCap className="w-4 h-4" /> Become Instructor
+          </Link>
+        )}
+        {isAdmin && (
+          <Link href="/admin" className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors">
+            <Shield className="w-4 h-4" /> Admin Panel
+          </Link>
+        )}
         <button
           onClick={handleLogout}
           className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-sidebar-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-colors"
