@@ -14,19 +14,28 @@ const protectedRoutes = [
   "/checkout",
 ];
 
+const instructorRoutes = ["/instructor"];
+
 /** Minimal JWT structure check — three base64url segments separated by dots. */
 function isValidJwtShape(token: string): boolean {
   const parts = token.split(".");
   if (parts.length !== 3) return false;
   try {
-    // Verify each part is valid base64url
     parts.forEach((p) => atob(p.replace(/-/g, "+").replace(/_/g, "/")));
-    // Decode payload and check expiry if present
     const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
     if (payload.exp && Date.now() / 1000 > payload.exp) return false;
     return true;
   } catch {
     return false;
+  }
+}
+
+function getRoleFromToken(token: string): string {
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+    return payload.role ?? "student";
+  } catch {
+    return "student";
   }
 }
 
@@ -53,7 +62,6 @@ export function middleware(request: NextRequest) {
     const token = tokenCookie?.value;
 
     if (!token || !isValidJwtShape(token)) {
-      // Clear any malformed/expired token cookie
       const response = NextResponse.redirect(
         `${origin}/login?returnUrl=${encodeURIComponent(pathname)}`
       );
@@ -61,6 +69,14 @@ export function middleware(request: NextRequest) {
         response.cookies.delete("auth-token");
       }
       return response;
+    }
+
+    // Instructor-only route guard
+    if (instructorRoutes.some((r) => pathname.startsWith(r))) {
+      const role = getRoleFromToken(token);
+      if (role !== "instructor" && role !== "admin") {
+        return NextResponse.redirect(`${origin}/dashboard`);
+      }
     }
   }
 
