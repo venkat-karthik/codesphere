@@ -50,7 +50,9 @@ export default function SignupPage() {
         body: JSON.stringify({
           email: form.email,
           password: form.password,
-          name: form.name
+          name: form.name,
+          role: 'student',
+          plan: selectedPlan,
         }),
       });
 
