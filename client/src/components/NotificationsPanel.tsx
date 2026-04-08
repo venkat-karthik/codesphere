@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { useNotifications } from '@/contexts/NotificationsContext';
 
-export function NotificationsPanel() {
+export function NotificationsPanel({ className }: { className?: string }) {
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [showRead, setShowRead] = useState(true);
   const { 
@@ -119,7 +119,7 @@ export function NotificationsPanel() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className={`space-y-4 ${className}`}>
       {/* Header with Stats */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">

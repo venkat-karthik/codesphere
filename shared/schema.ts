@@ -8,7 +8,7 @@ export const users = pgTable("users", {
   lastName: text("last_name").notNull(),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
-  role: text("role").notNull().default("student"), // 'admin' or 'student'
+  role: text("role").notNull().default("student"), // 'admin', 'sub_admin', or 'student'
   level: integer("level").notNull().default(1),
   xp: integer("xp").notNull().default(0),
   streak: integer("streak").notNull().default(0),
@@ -19,8 +19,15 @@ export const users = pgTable("users", {
   subscriptionExpiry: timestamp("subscription_expiry"),
   studyPattern: json("study_pattern"), // Track daily study patterns
   totalStudyTime: integer("total_study_time").notNull().default(0), // in minutes
+  codeCoins: integer("code_coins").notNull().default(0),
   joinDate: timestamp("join_date").notNull().defaultNow(),
   preferences: json("preferences"),
+  emailVerified: boolean("email_verified").notNull().default(false),
+  emailVerifyToken: text("email_verify_token"),
+  otp: text("otp"),
+  otpExpiry: timestamp("otp_expiry"),
+  passwordResetToken: text("password_reset_token"),
+  passwordResetExpiry: timestamp("password_reset_expiry"),
 });
 
 export const roadmaps = pgTable("roadmaps", {
@@ -120,11 +127,12 @@ export const payments = pgTable("payments", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
-  currency: text("currency").notNull().default("USD"),
+  currency: text("currency").notNull().default("INR"),
   subscriptionType: text("subscription_type").notNull(),
-  paymentMethod: text("payment_method").notNull(),
+  paymentMethod: text("payment_method").notNull().default("razorpay"),
   status: text("status").notNull().default("pending"), // 'pending', 'completed', 'failed'
-  transactionId: text("transaction_id"),
+  transactionId: text("transaction_id"),   // razorpay payment_id
+  orderId: text("order_id"),               // razorpay order_id
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -155,6 +163,23 @@ export const studentAnalytics = pgTable("student_analytics", {
   xpEarned: integer("xp_earned").notNull().default(0),
 });
 
+export const liveClasses = pgTable("live_classes", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  instructorId: text("instructor_id").notNull(),
+  instructorName: text("instructor_name").notNull(),
+  startTime: timestamp("start_time").notNull(),
+  endTime: timestamp("end_time").notNull(),
+  status: text("status").notNull().default("scheduled"), // 'scheduled', 'live', 'ended'
+  maxParticipants: integer("max_participants").notNull().default(50),
+  currentParticipants: integer("current_participants").notNull().default(0),
+  roomId: text("room_id").notNull(),
+  isRecording: boolean("is_recording").notNull().default(false),
+  tags: json("tags").notNull().default([]),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   joinDate: true,
@@ -180,6 +205,11 @@ export const insertCommunityPostSchema = createInsertSchema(communityPosts).omit
   replies: true,
 });
 
+export const insertLiveClassSchema = createInsertSchema(liveClasses).omit({
+  id: true,
+  createdAt: true,
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type Roadmap = typeof roadmaps.$inferSelect;
@@ -192,3 +222,5 @@ export type InsertProblem = z.infer<typeof insertProblemSchema>;
 export type UserSolution = typeof userSolutions.$inferSelect;
 export type CommunityPost = typeof communityPosts.$inferSelect;
 export type InsertCommunityPost = z.infer<typeof insertCommunityPostSchema>;
+export type LiveClass = typeof liveClasses.$inferSelect;
+export type InsertLiveClass = z.infer<typeof insertLiveClassSchema>;

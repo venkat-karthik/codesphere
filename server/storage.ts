@@ -5,7 +5,7 @@ import {
 } from "@shared/schema";
 
 export interface LiveClass {
-  id: string;
+  id: number;
   title: string;
   description: string;
   instructorId: string;
@@ -38,12 +38,18 @@ export interface IStorage {
   // User management
   getUser(id: number): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByResetToken(token: string): Promise<User | undefined>;
+  getUserByVerifyToken(token: string): Promise<User | undefined>;
+  getUserByOtp(otp: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: number, updates: Partial<User>): Promise<User | undefined>;
+  getAllUsers(): Promise<User[]>;
+  deleteUser(id: number): Promise<void>;
   
   // Roadmaps
   getAllRoadmaps(): Promise<Roadmap[]>;
   getRoadmap(id: number): Promise<Roadmap | undefined>;
+  createRoadmap(roadmap: any): Promise<Roadmap>;
   
   // User Progress
   getUserProgress(userId: number, roadmapId: number): Promise<UserProgress | undefined>;
@@ -53,11 +59,14 @@ export interface IStorage {
   getAllResources(): Promise<Resource[]>;
   getResourcesByCategory(category: string): Promise<Resource[]>;
   getResource(id: number): Promise<Resource | undefined>;
+  createResource(resource: any): Promise<Resource>;
+  updateResource(id: number, updates: any): Promise<Resource | undefined>;
   
   // Problems
   getAllProblems(): Promise<Problem[]>;
   getDailyProblem(date: Date): Promise<Problem | undefined>;
   getProblemsByDifficulty(difficulty: string): Promise<Problem[]>;
+  createProblem(problem: any): Promise<Problem>;
   
   // User Solutions
   getUserSolutions(userId: number): Promise<UserSolution[]>;
@@ -67,17 +76,38 @@ export interface IStorage {
   getAllPosts(): Promise<CommunityPost[]>;
   getPostsByCategory(category: string): Promise<CommunityPost[]>;
   createPost(post: InsertCommunityPost): Promise<CommunityPost>;
-
+  getAllChannels(): Promise<any[]>;
+  createChannel(channel: any): Promise<any>;
+  
   // Live Classes
   getAllLiveClasses(): Promise<LiveClass[]>;
-  getLiveClass(id: string): Promise<LiveClass | undefined>;
+  getLiveClass(id: number): Promise<LiveClass | undefined>;
   getLiveClassesByStatus(status: string): Promise<LiveClass[]>;
   getLiveClassesByInstructor(instructorId: string): Promise<LiveClass[]>;
   createLiveClass(liveClass: InsertLiveClass): Promise<LiveClass>;
-  updateLiveClass(id: string, updates: Partial<LiveClass>): Promise<LiveClass | undefined>;
-  deleteLiveClass(id: string): Promise<boolean>;
-  joinLiveClass(classId: string, userId: string, userName: string): Promise<{ success: boolean; message?: string; roomId?: string }>;
-  leaveLiveClass(classId: string, userId: string): Promise<void>;
+  updateLiveClass(id: number, updates: Partial<LiveClass>): Promise<LiveClass | undefined>;
+  deleteLiveClass(id: number): Promise<boolean>;
+  joinLiveClass(classId: number, userId: number, userName: string): Promise<{ success: boolean; message?: string; roomId?: string }>;
+  leaveLiveClass(classId: number, userId: number): Promise<void>;
+
+  // Projects
+  getUserProjects(userId: number): Promise<any[]>;
+  createProject(project: any): Promise<any>;
+  updateProject(id: number, userId: number, updates: any): Promise<any | undefined>;
+  deleteProject(id: number, userId: number): Promise<boolean>;
+
+  // Payments
+  createPayment(payment: any): Promise<any>;
+  updatePaymentByOrderId(orderId: string, updates: any): Promise<void>;
+  getUserPayments(userId: number): Promise<any[]>;
+
+  // Analytics
+  recordAnalytics(userId: number, data: { problemsAttempted?: number; problemsSolved?: number; xpEarned?: number; studyTimeMinutes?: number; videosWatched?: number; resourcesAccessed?: number }): Promise<void>;
+  getAnalytics(userId: number): Promise<any[]>;
+
+  // Channel Messages
+  getChannelMessages(channelId: number, limit?: number): Promise<any[]>;
+  createChannelMessage(msg: { channelId: number; userId: number; content: string; messageType?: string }): Promise<any>;
 }
 
 export class MemStorage implements IStorage {
@@ -88,7 +118,7 @@ export class MemStorage implements IStorage {
   private problems: Map<number, Problem>;
   private userSolutions: Map<number, UserSolution>;
   private communityPosts: Map<number, CommunityPost>;
-  private liveClasses: Map<string, LiveClass>;
+  private liveClasses: Map<number, LiveClass>;
   private currentId: number;
 
   constructor() {
@@ -105,7 +135,7 @@ export class MemStorage implements IStorage {
   }
 
   private initializeData() {
-    // Initialize with sample roadmaps
+    // Roadmaps...
     const frontendRoadmap: Roadmap = {
       id: this.currentId++,
       title: "Frontend Developer",
@@ -113,99 +143,28 @@ export class MemStorage implements IStorage {
       category: "Frontend",
       difficulty: "Beginner to Advanced",
       estimatedTime: "3-4 months",
-      modules: [
-        { id: "html-fundamentals", title: "HTML Fundamentals", completed: false },
-        { id: "css-basics", title: "CSS Basics", completed: false },
-        { id: "javascript-essentials", title: "JavaScript Essentials", completed: false },
-        { id: "responsive-design", title: "Responsive Design", completed: false },
-        { id: "css-frameworks", title: "CSS Frameworks", completed: false },
-        { id: "dom-manipulation", title: "JavaScript DOM Manipulation", completed: false },
-        { id: "es6-features", title: "ES6+ Features", completed: false },
-        { id: "build-tools", title: "Frontend Build Tools", completed: false },
-        { id: "react-fundamentals", title: "React Fundamentals", completed: false },
-        { id: "state-management", title: "State Management", completed: false },
-      ]
+      modules: []
     };
     this.roadmaps.set(frontendRoadmap.id, frontendRoadmap);
 
-    // Initialize with sample resources
-    const jsResource: Resource = {
+    // Sample Live Classes
+    const sampleClass: LiveClass = {
       id: this.currentId++,
-      title: "JavaScript Fundamentals Handbook",
-      description: "A comprehensive guide to JavaScript basics including variables, functions, and objects",
-      category: "JavaScript",
-      type: "pdf",
-      difficulty: "beginner",
-      tags: ["fundamentals", "basics"],
-      downloadCount: 1245,
-      fileSize: "2.4 MB",
-      pageCount: 42,
-      createdAt: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000), // 60 days ago
-      url: null
-    };
-    this.resources.set(jsResource.id, jsResource);
-
-    // Initialize with sample problems
-    const twoSumProblem: Problem = {
-      id: this.currentId++,
-      title: "Two Sum",
-      description: "Given an array of integers and a target sum, return indices of two numbers that add up to the target.",
-      difficulty: "Easy",
-      category: "Arrays",
-      tags: ["arrays", "hash-table"],
-      solution: "Use a hash map to store complements",
-      hints: ["Think about what you need to find for each number", "Can you do this in one pass?"],
-      xpReward: 150,
-      isDaily: true,
-      date: new Date()
-    };
-    this.problems.set(twoSumProblem.id, twoSumProblem);
-
-    // Initialize with sample live classes
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(14, 0, 0, 0); // 2 PM tomorrow
-
-    const dayAfterTomorrow = new Date();
-    dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
-    dayAfterTomorrow.setHours(10, 0, 0, 0); // 10 AM day after tomorrow
-
-    const sampleLiveClass1: LiveClass = {
-      id: "class_sample_1",
-      title: "JavaScript Fundamentals Live Session",
-      description: "Join us for an interactive session covering JavaScript basics, ES6 features, and modern development practices. Perfect for beginners!",
+      title: "Introduction to React",
+      description: "Learn the basics of React",
       instructorId: "1",
-      instructorName: "Sarah Chen",
-      startTime: tomorrow.toISOString(),
-      endTime: new Date(tomorrow.getTime() + 2 * 60 * 60 * 1000).toISOString(), // 2 hours later
+      instructorName: "John Doe",
+      startTime: new Date().toISOString(),
+      endTime: new Date().toISOString(),
       status: 'scheduled',
-      maxParticipants: 30,
-      currentParticipants: 12,
-      roomId: "room_sample_1",
+      maxParticipants: 50,
+      currentParticipants: 0,
+      roomId: "room1",
       isRecording: false,
-      tags: ["JavaScript", "Beginner", "ES6"],
+      tags: ["React"],
       createdAt: new Date().toISOString()
     };
-
-    const sampleLiveClass2: LiveClass = {
-      id: "class_sample_2",
-      title: "React Hooks Deep Dive",
-      description: "Advanced React concepts including custom hooks, context API, and performance optimization techniques.",
-      instructorId: "2",
-      instructorName: "Mike Rodriguez",
-      startTime: dayAfterTomorrow.toISOString(),
-      endTime: new Date(dayAfterTomorrow.getTime() + 1.5 * 60 * 60 * 1000).toISOString(), // 1.5 hours later
-      status: 'scheduled',
-      maxParticipants: 25,
-      currentParticipants: 8,
-      roomId: "room_sample_2",
-      isRecording: false,
-      tags: ["React", "Advanced", "Hooks"],
-      createdAt: new Date().toISOString()
-    };
-
-    this.liveClasses.set(sampleLiveClass1.id, sampleLiveClass1);
-    this.liveClasses.set(sampleLiveClass2.id, sampleLiveClass2);
+    this.liveClasses.set(sampleClass.id, sampleClass);
   }
 
   async getUser(id: number): Promise<User | undefined> {
@@ -221,11 +180,26 @@ export class MemStorage implements IStorage {
     const user: User = {
       ...insertUser,
       id,
+      role: insertUser.role || "student",
       level: 1,
       xp: 0,
       streak: 0,
+      theme: "dark",
+      profileImage: null,
+      bio: null,
+      subscriptionType: "free",
+      subscriptionExpiry: null,
+      studyPattern: null,
+      totalStudyTime: 0,
+      codeCoins: 0,
       joinDate: new Date(),
-      preferences: null
+      preferences: null,
+      emailVerified: false,
+      emailVerifyToken: null,
+      otp: null,
+      otpExpiry: null,
+      passwordResetToken: null,
+      passwordResetExpiry: null,
     };
     this.users.set(id, user);
     return user;
@@ -234,204 +208,118 @@ export class MemStorage implements IStorage {
   async updateUser(id: number, updates: Partial<User>): Promise<User | undefined> {
     const user = this.users.get(id);
     if (!user) return undefined;
-    
-    const updatedUser = { ...user, ...updates };
-    this.users.set(id, updatedUser);
-    return updatedUser;
+    const updated = { ...user, ...updates };
+    this.users.set(id, updated);
+    return updated;
   }
 
-  async getAllRoadmaps(): Promise<Roadmap[]> {
-    return Array.from(this.roadmaps.values());
+  async getAllUsers(): Promise<User[]> {
+    return Array.from(this.users.values());
   }
 
-  async getRoadmap(id: number): Promise<Roadmap | undefined> {
-    return this.roadmaps.get(id);
+  async deleteUser(id: number): Promise<void> {
+    this.users.delete(id);
   }
 
-  async getUserProgress(userId: number, roadmapId: number): Promise<UserProgress | undefined> {
-    const key = `${userId}-${roadmapId}`;
-    return this.userProgress.get(key);
-  }
+  async getUserByResetToken(_token: string): Promise<User | undefined> { return undefined; }
+  async getUserByVerifyToken(_token: string): Promise<User | undefined> { return undefined; }
+  async getUserByOtp(_otp: string): Promise<User | undefined> { return undefined; }
 
-  async updateUserProgress(userId: number, roadmapId: number, progress: Partial<UserProgress>): Promise<UserProgress> {
-    const key = `${userId}-${roadmapId}`;
-    const existing = this.userProgress.get(key);
-    
-    const updatedProgress: UserProgress = {
-      id: existing?.id || this.currentId++,
-      userId,
-      roadmapId,
-      completedModules: existing?.completedModules || [],
-      currentModule: existing?.currentModule || null,
-      progressPercentage: existing?.progressPercentage || 0,
-      lastAccessed: new Date(),
-      ...progress
-    };
-    
-    this.userProgress.set(key, updatedProgress);
-    return updatedProgress;
-  }
+  async getUserProjects(userId: number): Promise<any[]> { return []; }
+  async createProject(p: any): Promise<any> { return { ...p, id: Date.now() }; }
+  async updateProject(id: number, userId: number, u: any): Promise<any> { return null; }
+  async deleteProject(id: number, userId: number): Promise<boolean> { return false; }
 
-  async getAllResources(): Promise<Resource[]> {
-    return Array.from(this.resources.values());
-  }
+  async createPayment(p: any): Promise<any> { return { ...p, id: Date.now() }; }
+  async updatePaymentByOrderId(o: string, u: any): Promise<void> {}
+  async getUserPayments(userId: number): Promise<any[]> { return []; }
+  async recordAnalytics(u: number, d: any): Promise<void> {}
+  async getAnalytics(u: number): Promise<any[]> { return []; }
 
-  async getResourcesByCategory(category: string): Promise<Resource[]> {
-    return Array.from(this.resources.values()).filter(resource => 
-      resource.category.toLowerCase() === category.toLowerCase()
-    );
-  }
+  async getAllRoadmaps(): Promise<Roadmap[]> { return Array.from(this.roadmaps.values()); }
+  async getRoadmap(id: number): Promise<Roadmap | undefined> { return this.roadmaps.get(id); }
+  async createRoadmap(r: any): Promise<Roadmap> { const id = this.currentId++; const road = { ...r, id }; this.roadmaps.set(id, road); return road; }
 
-  async getResource(id: number): Promise<Resource | undefined> {
-    return this.resources.get(id);
-  }
+  async getUserProgress(userId: number, roadmapId: number): Promise<UserProgress | undefined> { return undefined; }
+  async updateUserProgress(userId: number, roadmapId: number, progress: any): Promise<UserProgress> { return {} as any; }
 
-  async getAllProblems(): Promise<Problem[]> {
-    return Array.from(this.problems.values());
-  }
+  async getAllResources(): Promise<Resource[]> { return []; }
+  async getResourcesByCategory(c: string): Promise<Resource[]> { return []; }
+  async getResource(id: number): Promise<Resource | undefined> { return undefined; }
+  async createResource(r: any): Promise<Resource> { return {} as any; }
+  async updateResource(id: number, updates: any): Promise<Resource | undefined> { return undefined; }
 
-  async getDailyProblem(date: Date): Promise<Problem | undefined> {
-    const today = date.toDateString();
-    return Array.from(this.problems.values()).find(problem => 
-      problem.isDaily && problem.date?.toDateString() === today
-    );
-  }
+  async getAllProblems(): Promise<Problem[]> { return []; }
+  async getDailyProblem(date: Date): Promise<Problem | undefined> { return undefined; }
+  async getProblemsByDifficulty(d: string): Promise<Problem[]> { return []; }
+  async createProblem(p: any): Promise<Problem> { return {} as any; }
+  async getUserSolutions(userId: number): Promise<UserSolution[]> { return []; }
+  async submitSolution(u: number, p: number, s: string, c: boolean, x: number): Promise<UserSolution> { return {} as any; }
 
-  async getProblemsByDifficulty(difficulty: string): Promise<Problem[]> {
-    return Array.from(this.problems.values()).filter(problem => 
-      problem.difficulty.toLowerCase() === difficulty.toLowerCase()
-    );
-  }
-
-  async getUserSolutions(userId: number): Promise<UserSolution[]> {
-    return Array.from(this.userSolutions.values()).filter(solution => 
-      solution.userId === userId
-    );
-  }
-
-  async submitSolution(userId: number, problemId: number, solution: string, isCorrect: boolean, xpEarned: number): Promise<UserSolution> {
+  async getAllPosts(): Promise<CommunityPost[]> { return []; }
+  async getPostsByCategory(c: string): Promise<CommunityPost[]> { return []; }
+  async createPost(p: InsertCommunityPost): Promise<CommunityPost> {
     const id = this.currentId++;
-    const userSolution: UserSolution = {
-      id,
-      userId,
-      problemId,
-      solution,
-      isCorrect,
-      submittedAt: new Date(),
-      xpEarned
+    const post: CommunityPost = { 
+      ...p, id, likes: 0, replies: 0, isResolved: false, createdAt: new Date(),
+      tags: p.tags || []
     };
-    
-    this.userSolutions.set(id, userSolution);
-    return userSolution;
-  }
-
-  async getAllPosts(): Promise<CommunityPost[]> {
-    return Array.from(this.communityPosts.values())
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-  }
-
-  async getPostsByCategory(category: string): Promise<CommunityPost[]> {
-    return Array.from(this.communityPosts.values())
-      .filter(post => post.category.toLowerCase() === category.toLowerCase())
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-  }
-
-  async createPost(insertPost: InsertCommunityPost): Promise<CommunityPost> {
-    const id = this.currentId++;
-    const post: CommunityPost = {
-      ...insertPost,
-      id,
-      likes: 0,
-      replies: 0,
-      isResolved: false,
-      createdAt: new Date()
-    };
-    
-    this.communityPosts.set(id, post);
     return post;
   }
+  async getAllChannels(): Promise<any[]> { return []; }
+  async createChannel(c: any): Promise<any> { return {}; }
+  async getChannelMessages(c: number, l?: number): Promise<any[]> { return []; }
+  async createChannelMessage(m: any): Promise<any> { return {}; }
 
   async getAllLiveClasses(): Promise<LiveClass[]> {
     return Array.from(this.liveClasses.values());
   }
 
-  async getLiveClass(id: string): Promise<LiveClass | undefined> {
+  async getLiveClass(id: number): Promise<LiveClass | undefined> {
     return this.liveClasses.get(id);
   }
 
   async getLiveClassesByStatus(status: string): Promise<LiveClass[]> {
-    return Array.from(this.liveClasses.values()).filter(liveClass => 
-      liveClass.status === status
-    );
+    return Array.from(this.liveClasses.values()).filter(c => c.status === status);
   }
 
-  async getLiveClassesByInstructor(instructorId: string): Promise<LiveClass[]> {
-    return Array.from(this.liveClasses.values()).filter(liveClass => 
-      liveClass.instructorId === instructorId
-    );
+  async getLiveClassesByInstructor(id: string): Promise<LiveClass[]> {
+    return Array.from(this.liveClasses.values()).filter(c => c.instructorId === id);
   }
 
-  async createLiveClass(liveClass: InsertLiveClass): Promise<LiveClass> {
-    const id = `class_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const newLiveClass: LiveClass = {
-      ...liveClass,
-      id,
-      currentParticipants: 0,
-      isRecording: false,
-      createdAt: new Date().toISOString()
-    };
-    
-    this.liveClasses.set(id, newLiveClass);
-    return newLiveClass;
+  async createLiveClass(lc: InsertLiveClass): Promise<LiveClass> {
+    const id = this.currentId++;
+    const live: LiveClass = { ...lc, id, currentParticipants: 0, isRecording: false, createdAt: new Date().toISOString() };
+    this.liveClasses.set(id, live);
+    return live;
   }
 
-  async updateLiveClass(id: string, updates: Partial<LiveClass>): Promise<LiveClass | undefined> {
-    const liveClass = this.liveClasses.get(id);
-    if (!liveClass) return undefined;
-    
-    const updatedLiveClass = { ...liveClass, ...updates };
-    this.liveClasses.set(id, updatedLiveClass);
-    return updatedLiveClass;
+  async updateLiveClass(id: number, updates: Partial<LiveClass>): Promise<LiveClass | undefined> {
+    const live = this.liveClasses.get(id);
+    if (!live) return undefined;
+    const updated = { ...live, ...updates };
+    this.liveClasses.set(id, updated);
+    return updated;
   }
 
-  async deleteLiveClass(id: string): Promise<boolean> {
-    const exists = this.liveClasses.has(id);
-    if (exists) {
-      this.liveClasses.delete(id);
-    }
-    return exists;
+  async deleteLiveClass(id: number): Promise<boolean> {
+    return this.liveClasses.delete(id);
   }
 
-  async joinLiveClass(classId: string, userId: string, userName: string): Promise<{ success: boolean; message?: string; roomId?: string }> {
-    const liveClass = this.liveClasses.get(classId);
-    
-    if (!liveClass) {
-      return { success: false, message: "Live class not found" };
-    }
-    
-    if (liveClass.status === 'ended') {
-      return { success: false, message: "This live class has ended" };
-    }
-    
-    if (liveClass.currentParticipants >= liveClass.maxParticipants) {
-      return { success: false, message: "Live class is full" };
-    }
-    
-    // Update participant count
-    liveClass.currentParticipants += 1;
-    this.liveClasses.set(classId, liveClass);
-    
-    return { success: true, roomId: liveClass.roomId };
+  async joinLiveClass(id: number, userId: number, userName: string): Promise<{ success: boolean; roomId?: string }> {
+    const live = this.liveClasses.get(id);
+    if (!live) return { success: false };
+    live.currentParticipants++;
+    return { success: true, roomId: live.roomId };
   }
 
-  async leaveLiveClass(classId: string, userId: string): Promise<void> {
-    const liveClass = this.liveClasses.get(classId);
-    
-    if (liveClass && liveClass.currentParticipants > 0) {
-      liveClass.currentParticipants -= 1;
-      this.liveClasses.set(classId, liveClass);
-    }
+  async leaveLiveClass(id: number, userId: number): Promise<void> {
+    const live = this.liveClasses.get(id);
+    if (live && live.currentParticipants > 0) live.currentParticipants--;
   }
 }
 
-export const storage = new MemStorage();
+import { db } from "./db";
+import { DbStorage } from "./dbStorage";
+
+export const storage: IStorage = db ? new DbStorage() : new MemStorage();

@@ -1,8 +1,8 @@
-import { useState } from 'react';
-import { useLocation } from 'wouter';
+import { useState, useEffect } from 'react';
+import { useLocation, Link } from 'wouter';
 import { 
   Home, 
-  Route, 
+  Route as RoadmapIcon, 
   FileText, 
   Play, 
   Users, 
@@ -13,313 +13,214 @@ import {
   Settings,
   LogOut,
   X,
-  Menu,
   Flame,
   Star,
-  Shield,
   BarChart3,
-  Video
+  Video,
+  Store,
+  BookOpen,
+  Film,
+  Globe2,
+  ChevronRight,
 } from 'lucide-react';
-import { useAuth } from '../hooks/useAuth';
-import { useUserRole } from '../contexts/UserRoleContext';
+import { useAuth } from '@/hooks/useAuth';
+import { useUserRole } from '@/contexts/UserRoleContext';
 import { ThemeToggle } from './ThemeToggle';
-import { Section } from '../types';
+import { Section } from '@/types';
 import { Button } from '@/components/ui/button';
+import { getNarutoRank } from '@/lib/utils';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface SidebarProps {
   currentSection: Section;
-  onSectionChange: (section: Section) => void;
   onAuthModalOpen: (mode: 'login' | 'register') => void;
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
-export function Sidebar({ currentSection, onSectionChange, onAuthModalOpen }: SidebarProps) {
+export function Sidebar({ currentSection, onAuthModalOpen, mobileOpen, onMobileClose }: SidebarProps) {
   const { isAuthenticated, user, logout } = useAuth();
-  const { isAdmin, isStudent } = useUserRole();
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const [, setLocation] = useLocation();
+  const { isAdmin, isSubAdmin, isStudent } = useUserRole();
+  const [isCollapsed, setIsCollapsed] = useState(true);
+  const [location] = useLocation();
+
+  // Sync with parent mobile state
+  useEffect(() => {
+    if (mobileOpen !== undefined) setIsCollapsed(!mobileOpen);
+  }, [mobileOpen]);
+
+  const handleClose = () => {
+    setIsCollapsed(true);
+    onMobileClose?.();
+  };
+
+  const navItemVariants = {
+    initial: { x: -20, opacity: 0 },
+    animate: { x: 0, opacity: 1 },
+    hover: { x: 5, transition: { duration: 0.2 } },
+  };
+
+  const sidebarVariants = {
+    open: { x: 0, transition: { type: 'spring', stiffness: 300, damping: 30 } },
+    closed: { x: '-100%', transition: { type: 'spring', stiffness: 300, damping: 30 } },
+  };
+
+  const NavItem = ({ item }: { item: any }) => {
+    const isActive = currentSection === item.id || location === item.path;
+    return (
+      <Link href={item.path}>
+        <motion.a
+          variants={navItemVariants}
+          whileHover="hover"
+          onClick={handleClose}
+          className={`group flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-300 cursor-pointer ${
+            isActive
+              ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20 bg-gradient-to-r from-primary to-primary/80'
+              : 'text-sidebar-foreground hover:bg-primary/10 hover:text-primary'
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <div className={`p-1.5 rounded-lg transition-colors ${isActive ? 'bg-white/20' : 'bg-primary/5 group-hover:bg-primary/20'}`}>
+              <item.icon className="h-4 w-4" />
+            </div>
+            <span className="font-medium text-sm">{item.label}</span>
+          </div>
+          {isActive && (
+            <motion.div layoutId="active-indicator">
+              <ChevronRight className="h-3 w-3 opacity-50" />
+            </motion.div>
+          )}
+        </motion.a>
+      </Link>
+    );
+  };
 
   if (!isAuthenticated) {
     return (
-      <div className="fixed left-0 top-0 h-full bg-sidebar-background border-r border-sidebar-border z-50 w-64 flex flex-col justify-between">
-        <div>
-          {/* Logo/Header */}
-          <div
-            className="flex items-center space-x-3 p-6 cursor-pointer select-none"
-            onClick={() => setLocation('/')}
-          >
-            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-lg">CS</span>
+      <motion.div 
+        initial="closed"
+        animate="open"
+        variants={sidebarVariants}
+        className="fixed left-0 top-0 h-full glass border-r z-50 w-72 flex flex-col"
+      >
+        <div className="p-8">
+          <Link href="/">
+            <div className="flex items-center space-x-3 cursor-pointer group">
+              <motion.div 
+                whileHover={{ rotate: 180 }}
+                className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20"
+              >
+                <span className="text-primary-foreground font-black text-xl">CS</span>
+              </motion.div>
+              <h1 className="text-2xl font-black tracking-tighter text-gradient group-hover:opacity-80 transition-opacity">CodeSphere</h1>
             </div>
-            <div>
-              <h1 className="text-xl font-bold">CodeSphere</h1>
-            </div>
-          </div>
-          <div className="px-6 pb-2 text-xs text-muted-foreground font-semibold">Navigation</div>
-          <div className="flex flex-col gap-2 px-4 mt-2">
-            <button
-              onClick={() => onAuthModalOpen('login')}
-              className="flex items-center space-x-2 px-4 py-2 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
-            >
-              <span>Login</span>
-            </button>
-            <button
-              onClick={() => onAuthModalOpen('register')}
-              className="flex items-center space-x-2 px-4 py-2 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
-            >
-              <span>Register</span>
-            </button>
+          </Link>
+          
+          <div className="mt-12 space-y-4">
+            <p className="text-xs font-black uppercase tracking-widest text-muted-foreground/50 px-4">Get Started</p>
+            <Button onClick={() => onAuthModalOpen('login')} className="w-full justify-start gap-3 rounded-2xl h-11" variant="ghost">
+              <User className="h-4 w-4" /> Login
+            </Button>
+            <Button onClick={() => onAuthModalOpen('register')} className="w-full justify-start gap-3 rounded-2xl h-11 shadow-lg shadow-primary/10">
+              <Star className="h-4 w-4" /> Join Community
+            </Button>
           </div>
         </div>
-        <div className="p-4 text-xs text-muted-foreground opacity-60">© CodeSphere</div>
-      </div>
+        <div className="mt-auto p-8 border-t border-border/50">
+          <p className="text-[10px] uppercase font-black tracking-widest text-muted-foreground/30">© 2024 CodeSphere AI</p>
+        </div>
+      </motion.div>
     );
   }
 
-  const learningNavigation = [
-    { id: 'dashboard' as Section, icon: Home, label: 'Dashboard' },
-    { id: 'roadmaps' as Section, icon: Route, label: 'Learning Roadmaps' },
-    { id: 'resources' as Section, icon: FileText, label: 'PDF Resources' },
-    { id: 'videos' as Section, icon: Play, label: 'Video Library' },
-    { id: 'problems' as Section, icon: Puzzle, label: 'Daily Problems' },
-    { id: 'studio' as Section, icon: Code, label: 'Project Studio' },
-    { id: 'sandbox' as Section, icon: Code, label: 'App Sandbox' },
-    { id: 'mentor' as Section, icon: Bot, label: 'AI Mentor' },
-    { id: 'sphere-map' as Section, icon: Star, label: 'Sphere Map' }
+  // Navigation data remains same but used with NavItem component
+  const sections = [
+    { title: 'Home', items: [{ id: 'dashboard' as Section, icon: Home, label: 'Dashboard', path: '/dashboard' }] },
+    { title: 'Learn', items: [
+      { id: 'roadmaps' as Section, icon: RoadmapIcon, label: 'Roadmaps', path: '/learning/roadmaps' },
+      { id: 'videos' as Section, icon: Play, label: 'Video Library', path: '/learning/videos' },
+      { id: 'problems' as Section, icon: Puzzle, label: 'Daily Problems', path: '/practice/problems' },
+      { id: 'studio' as Section, icon: Code, label: 'Project Studio', path: '/studio' },
+    ]},
+    { title: 'Engage', items: [
+      { id: 'community' as Section, icon: Users, label: 'Community', path: '/community' },
+      { id: 'live-classes' as Section, icon: Video, label: 'Live Classes', path: '/learning/live-classes' },
+    ]},
+    { title: 'Tools', items: [
+      { id: 'mentor' as Section, icon: Bot, label: 'AI Mentor', path: '/mentor' },
+      { id: 'sandbox' as Section, icon: Code, label: 'App Sandbox', path: '/learning/sandbox' },
+    ]},
   ];
-
-  const collaborationNavigation = [
-    { id: 'community' as Section, icon: Users, label: 'Community Lounge' },
-    { id: 'live-classes' as Section, icon: Video, label: 'Live Classes' }
-  ];
-
-  const analyticsNavigation = [
-    { id: 'platform-analytics' as Section, icon: BarChart3, label: 'Analytics Dashboard' },
-    ...(isAdmin ? [{ id: 'admin-dashboard' as Section, icon: Shield, label: 'Admin Dashboard' }] : [])
-  ];
-
-  const profileNavigation = [
-    { id: 'profile' as Section, icon: User, label: 'Profile' },
-    { id: 'settings' as Section, icon: Settings, label: 'Settings' }
-  ];
-
-  const xpProgress = user ? (user.xp / user.nextLevelXP) * 100 : 0;
 
   return (
     <>
-      {/* Mobile overlay */}
-      {!isCollapsed && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          onClick={() => setIsCollapsed(true)}
-        />
-      )}
+      <AnimatePresence>
+        {!isCollapsed && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 lg:hidden"
+            onClick={handleClose}
+          />
+        )}
+      </AnimatePresence>
 
-      {/* Sidebar */}
-      <div className={`fixed left-0 top-0 h-full bg-sidebar-background border-r border-sidebar-border z-50 transition-transform duration-300 ${
-        isCollapsed ? '-translate-x-full lg:translate-x-0' : 'translate-x-0'
-      } w-80 lg:w-72 overflow-y-auto scrollbar-hide`}>
-        <div className="p-6">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-8">
-            <div
-              className="flex items-center space-x-3 cursor-pointer select-none"
-              onClick={() => setLocation('/')}
-            >
-              <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-                <span className="text-primary-foreground font-bold text-lg">CS</span>
+      <motion.div 
+        initial={false}
+        animate={isCollapsed ? "closed" : "open"}
+        variants={sidebarVariants}
+        className="fixed left-0 top-0 h-full glass border-r z-50 w-72 flex flex-col lg:translate-x-0"
+      >
+        <div className="p-6 h-full flex flex-col overflow-y-auto scrollbar-hide">
+          <div className="flex items-center justify-between mb-10">
+            <Link href="/">
+              <div className="flex items-center space-x-3 cursor-pointer group">
+                <motion.div 
+                  whileHover={{ rotate: 90 }}
+                  className="w-9 h-9 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20"
+                >
+                  <span className="text-primary-foreground font-black text-lg">CS</span>
+                </motion.div>
+                <h1 className="text-xl font-black tracking-tighter text-gradient overflow-hidden">CodeSphere</h1>
               </div>
-              <div>
-                <h1 className="text-xl font-bold">CodeSphere</h1>
-                <p className="text-xs text-muted-foreground">Learning Platform</p>
-              </div>
-            </div>
-            <button
-              onClick={() => setIsCollapsed(true)}
-              className="lg:hidden text-muted-foreground hover:text-foreground"
-            >
-              <X className="h-5 w-5" />
-            </button>
+            </Link>
+            <Button variant="ghost" size="icon" onClick={handleClose} className="lg:hidden">
+              <X className="h-4 w-4" />
+            </Button>
           </div>
 
-          {/* User Profile */}
-          {isAuthenticated && user ? (
-            <div className="bg-card/50 rounded-xl p-4 mb-6">
-              <div className="flex items-center space-x-3 mb-3">
-                <div className="w-12 h-12 bg-gradient-to-br from-primary to-purple-600 rounded-full flex items-center justify-center">
-                  <span className="text-primary-foreground font-semibold">
-                    {user.firstName[0]}{user.lastName[0]}
-                  </span>
-                </div>
-                <div className="flex-1">
-                  <div className="font-semibold">{user.firstName} {user.lastName}</div>
-                  <div className="text-sm text-muted-foreground">Level {user.level}</div>
+          <div className="space-y-8 flex-1">
+            {sections.map((section, idx) => (
+              <div key={idx}>
+                <h3 className="px-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground/50 mb-3">{section.title}</h3>
+                <div className="space-y-1">
+                  {section.items.map(item => <NavItem key={item.id} item={item} />)}
                 </div>
               </div>
-              
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm text-muted-foreground">
-                  <span>XP Progress</span>
-                  <span>{user.xp}/{user.nextLevelXP}</span>
-                </div>
-                <div className="w-full bg-muted rounded-full h-2">
-                  <div 
-                    className="progress-bar h-2 rounded-full transition-all duration-300" 
-                    style={{ width: `${xpProgress}%` }}
-                  />
-                </div>
-                <div className="flex justify-between text-sm">
-                  <div className="flex items-center space-x-1">
-                    <Flame className="h-4 w-4 text-orange-500" />
-                    <span className="text-orange-500 font-semibold">{user.streak}</span>
-                  </div>
-                  <div className="text-muted-foreground">
-                    Courses: {user.completedCourses}
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="bg-card/50 rounded-xl p-4 mb-6 text-center">
-              <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center mx-auto mb-3">
-                <User className="h-6 w-6 text-muted-foreground" />
-              </div>
-              <p className="text-sm text-muted-foreground mb-3">Sign in to track your progress</p>
-              <Button 
-                onClick={() => onAuthModalOpen('login')}
-                className="w-full"
-                size="sm"
-              >
-                Sign In
-              </Button>
-            </div>
-          )}
-
-          {/* Navigation Groups */}
-          <div className="space-y-6">
-            <div>
-              <div className="px-6 pb-2 text-xs text-muted-foreground font-semibold uppercase tracking-wider">Learning</div>
-              <nav className="space-y-2">
-                {learningNavigation.map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => onSectionChange(item.id)}
-                    className={`sidebar-item w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left ${
-                      currentSection === item.id
-                        ? 'bg-primary text-primary-foreground'
-                        : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                    }`}
-                  >
-                    <item.icon className="h-5 w-5 flex-shrink-0" />
-                    <span>{item.label}</span>
-                  </button>
-                ))}
-              </nav>
-            </div>
-            <div>
-              <div className="px-6 pb-2 text-xs text-muted-foreground font-semibold uppercase tracking-wider">Collaboration</div>
-              <nav className="space-y-2">
-                {collaborationNavigation.map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => onSectionChange(item.id)}
-                    className={`sidebar-item w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left ${
-                      currentSection === item.id
-                        ? 'bg-primary text-primary-foreground'
-                        : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                    }`}
-                  >
-                    <item.icon className="h-5 w-5 flex-shrink-0" />
-                    <span>{item.label}</span>
-                  </button>
-                ))}
-              </nav>
-            </div>
-            {analyticsNavigation.length > 0 && (
+            ))}
+            
+            {(isAdmin || isSubAdmin) && (
               <div>
-                <div className="px-6 pb-2 text-xs text-muted-foreground font-semibold uppercase tracking-wider">Analytics & Admin</div>
-                <nav className="space-y-2">
-                  {analyticsNavigation.map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => onSectionChange(item.id)}
-                      className={`sidebar-item w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left ${
-                        currentSection === item.id
-                          ? 'bg-primary text-primary-foreground'
-                          : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                      }`}
-                    >
-                      <item.icon className="h-5 w-5 flex-shrink-0" />
-                      <span>{item.label}</span>
-                    </button>
-                  ))}
-                </nav>
+                <h3 className="px-4 text-[10px] font-black uppercase tracking-widest text-primary/50 mb-3">Administration</h3>
+                <div className="space-y-1">
+                  <NavItem item={{ id: 'platform-analytics' as Section, icon: BarChart3, label: 'Analytics', path: '/admin/analytics' }} />
+                  <NavItem item={{ id: 'admin-live-classes' as Section, icon: Video, label: 'Class Management', path: '/admin/live-classes' }} />
+                </div>
               </div>
             )}
-            <div>
-              <div className="px-6 pb-2 text-xs text-muted-foreground font-semibold uppercase tracking-wider">Profile & Settings</div>
-              <nav className="space-y-2">
-                {profileNavigation.map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => onSectionChange(item.id)}
-                    className={`sidebar-item w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left ${
-                      currentSection === item.id
-                        ? 'bg-primary text-primary-foreground'
-                        : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                    }`}
-                  >
-                    <item.icon className="h-5 w-5 flex-shrink-0" />
-                    <span>{item.label}</span>
-                  </button>
-                ))}
-              </nav>
-            </div>
           </div>
 
-          {/* Theme Toggle */}
-          <div className="flex justify-center mb-4">
-            <ThemeToggle />
-          </div>
-
-          {/* Auth Buttons / Logout */}
-          <div className="mt-8">
-            {isAuthenticated ? (
-              <Button
-                onClick={logout}
-                variant="destructive"
-                className="w-full"
-              >
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
+          <div className="mt-10 pt-6 border-t border-border/50">
+            <div className="flex items-center justify-between px-2">
+              <ThemeToggle />
+              <Button variant="ghost" size="icon" onClick={() => logout()} className="text-muted-foreground hover:text-destructive">
+                <LogOut className="h-4 w-4" />
               </Button>
-            ) : (
-              <div className="space-y-2">
-                <Button
-                  onClick={() => onAuthModalOpen('login')}
-                  variant="outline"
-                  className="w-full"
-                >
-                  Login
-                </Button>
-                <Button
-                  onClick={() => onAuthModalOpen('register')}
-                  className="w-full"
-                >
-                  Sign Up
-                </Button>
-              </div>
-            )}
+            </div>
           </div>
         </div>
-      </div>
-
-      {/* Mobile menu button */}
-      <button
-        onClick={() => setIsCollapsed(false)}
-        className="fixed top-4 left-4 z-40 lg:hidden bg-card border border-border p-2 rounded-lg"
-      >
-        <Menu className="h-5 w-5" />
-      </button>
+      </motion.div>
     </>
   );
 }

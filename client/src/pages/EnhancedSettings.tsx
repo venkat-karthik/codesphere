@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,8 +10,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
-import { useTheme } from '../contexts/ThemeContext';
-import { useUserRole } from '../contexts/UserRoleContext';
+import { useTheme } from '@/contexts/ThemeContext';
+import { useUserRole } from '@/contexts/UserRoleContext';
+import { useAuth } from '@/hooks/useAuth';
+import { apiRequest } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
 import { 
   User, 
   Bell, 
@@ -49,17 +53,75 @@ import {
 export function EnhancedSettings() {
   const { theme, setTheme } = useTheme();
   const { isAdmin } = useUserRole();
-  
+  const { user, updateUser } = useAuth();
+  const { toast } = useToast();
+  const qc = useQueryClient();
+
   const [profile, setProfile] = useState({
-    firstName: 'John',
-    lastName: 'Doe',
-    email: 'john.doe@example.com',
-    bio: 'Passionate developer learning new technologies every day.',
-    location: 'San Francisco, CA',
-    website: 'https://johndoe.dev',
-    github: 'johndoe',
-    linkedin: 'johndoe',
-    twitter: 'johndoe'
+    firstName: user?.firstName || '',
+    lastName: user?.lastName || '',
+    email: user?.email || '',
+    bio: user?.bio || '',
+    location: '',
+    website: '',
+    github: '',
+    linkedin: '',
+    twitter: '',
+  });
+
+  // Sync profile state when user loads
+  useEffect(() => {
+    if (user) {
+      setProfile(p => ({
+        ...p,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        bio: user.bio || '',
+      }));
+    }
+  }, [user]);
+
+  const [passwordForm, setPasswordForm] = useState({ current: '', newPass: '', confirm: '' });
+  const [passwordError, setPasswordError] = useState('');
+
+  const saveProfileMutation = useMutation({
+    mutationFn: async () => {
+      if (!user || user.id <= 0) throw new Error('Demo accounts cannot save profile');
+      const res = await apiRequest('PATCH', `/api/users/${user.id}`, {
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        bio: profile.bio,
+      });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      updateUser({ firstName: data.firstName, lastName: data.lastName, bio: data.bio });
+      toast({ title: 'Profile saved', description: 'Your profile has been updated.' });
+    },
+    onError: (err: any) => {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    },
+  });
+
+  const changePasswordMutation = useMutation({
+    mutationFn: async () => {
+      if (passwordForm.newPass !== passwordForm.confirm) throw new Error('Passwords do not match');
+      if (passwordForm.newPass.length < 6) throw new Error('Password must be at least 6 characters');
+      const res = await apiRequest('POST', '/api/auth/change-password', {
+        currentPassword: passwordForm.current,
+        newPassword: passwordForm.newPass,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      setPasswordForm({ current: '', newPass: '', confirm: '' });
+      setPasswordError('');
+      toast({ title: 'Password changed', description: 'Your password has been updated.' });
+    },
+    onError: (err: any) => {
+      setPasswordError(err.message);
+    },
   });
 
   const [preferences, setPreferences] = useState({
@@ -108,24 +170,27 @@ export function EnhancedSettings() {
   });
 
   const handleSaveProfile = () => {
-    console.log('Saving profile:', profile);
-    // Here you would typically save to your backend
+    saveProfileMutation.mutate();
   };
 
   const handleSavePreferences = () => {
-    console.log('Saving preferences:', preferences);
+    toast({ title: 'Preferences saved' });
   };
 
   const handleSaveNotifications = () => {
-    console.log('Saving notifications:', notifications);
+    toast({ title: 'Notifications saved' });
   };
 
   const handleSavePrivacy = () => {
-    console.log('Saving privacy settings:', privacy);
+    toast({ title: 'Privacy settings saved' });
   };
 
   const handleSaveSecurity = () => {
-    console.log('Saving security settings:', security);
+    if (passwordForm.current) {
+      changePasswordMutation.mutate();
+    } else {
+      toast({ title: 'Security settings saved' });
+    }
   };
 
   return (
@@ -166,17 +231,48 @@ export function EnhancedSettings() {
             <CardContent className="space-y-6">
               {/* Profile Picture */}
               <div className="flex items-center space-x-4">
-                <div className="w-20 h-20 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-2xl font-bold">
-                  {profile.firstName[0]}{profile.lastName[0]}
+                <div className="w-20 h-20 rounded-full overflow-hidden bg-primary flex items-center justify-center text-primary-foreground text-2xl font-bold shrink-0">
+                  {user?.profileImage
+                    ? <img src={user.profileImage} alt="avatar" className="w-full h-full object-cover" />
+                    : `${profile.firstName[0] || '?'}${profile.lastName[0] || ''}`}
                 </div>
                 <div className="space-y-2">
-                  <Button size="sm">
-                    <Camera className="mr-2 h-4 w-4" />
-                    Change Photo
-                  </Button>
-                  <p className="text-xs text-muted-foreground">
-                    JPG, PNG or GIF. Max size 2MB.
-                  </p>
+                  <label className="cursor-pointer">
+                    <Button size="sm" asChild>
+                      <span><Camera className="mr-2 h-4 w-4" />Change Photo</span>
+                    </Button>
+                    <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file || !user || user.id <= 0) return;
+                        const reader = new FileReader();
+                        reader.onload = async (ev) => {
+                          const dataUrl = ev.target?.result as string;
+                          const [header, base64] = dataUrl.split(',');
+                          const mimeType = header.match(/:(.*?);/)?.[1] || 'image/jpeg';
+                          try {
+                            const res = await fetch(`/api/users/${user.id}/avatar`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              credentials: 'include',
+                              body: JSON.stringify({ imageData: base64, mimeType }),
+                            });
+                            const data = await res.json();
+                            if (res.ok) {
+                              updateUser({ profileImage: data.profileImage } as any);
+                              toast({ title: 'Profile photo updated' });
+                            } else {
+                              toast({ title: 'Error', description: data.message, variant: 'destructive' });
+                            }
+                          } catch {
+                            toast({ title: 'Upload failed', variant: 'destructive' });
+                          }
+                        };
+                        reader.readAsDataURL(file);
+                      }} />
+                  </label>
+                  <p className="text-xs text-muted-foreground">JPG, PNG, WebP or GIF. Max 2MB.</p>
+                  {user && user.id <= 0 && <p className="text-xs text-muted-foreground">Demo accounts cannot upload photos.</p>}
                 </div>
               </div>
 
@@ -985,43 +1081,57 @@ export function EnhancedSettings() {
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <Shield className="h-5 w-5" />
+                  <span>Change Password</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Current Password</Label>
+                  <Input type="password" value={passwordForm.current}
+                    onChange={e => setPasswordForm(p => ({ ...p, current: e.target.value }))}
+                    placeholder="Enter current password" />
+                </div>
+                <div className="space-y-2">
+                  <Label>New Password</Label>
+                  <Input type="password" value={passwordForm.newPass}
+                    onChange={e => setPasswordForm(p => ({ ...p, newPass: e.target.value }))}
+                    placeholder="At least 6 characters" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Confirm New Password</Label>
+                  <Input type="password" value={passwordForm.confirm}
+                    onChange={e => setPasswordForm(p => ({ ...p, confirm: e.target.value }))}
+                    placeholder="Repeat new password" />
+                </div>
+                {passwordError && <p className="text-sm text-destructive">{passwordError}</p>}
+                {user && user.id <= 0 && (
+                  <p className="text-xs text-muted-foreground">Demo accounts cannot change password.</p>
+                )}
+                <Button
+                  onClick={() => changePasswordMutation.mutate()}
+                  disabled={!passwordForm.current || !passwordForm.newPass || changePasswordMutation.isPending || (user?.id ?? 0) <= 0}
+                >
+                  {changePasswordMutation.isPending ? 'Changing...' : 'Change Password'}
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Shield className="h-5 w-5" />
                   <span>Account Security</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Password</Label>
-                  <div className="flex items-center justify-between p-3 border rounded-lg">
-                    <div>
-                      <p className="text-sm font-medium">••••••••••••</p>
-                      <p className="text-xs text-muted-foreground">
-                        Last changed: {security.passwordLastChanged}
-                      </p>
-                    </div>
-                    <Button variant="outline" size="sm">
-                      Change Password
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
                   <Label>Two-Factor Authentication</Label>
                   <div className="flex items-center justify-between p-3 border rounded-lg">
                     <div>
-                      <p className="text-sm font-medium">
-                        {security.twoFactorEnabled ? 'Enabled' : 'Disabled'}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Add an extra layer of security to your account
-                      </p>
+                      <p className="text-sm font-medium">Disabled</p>
+                      <p className="text-xs text-muted-foreground">Add an extra layer of security (coming soon)</p>
                     </div>
-                    <Button 
-                      variant={security.twoFactorEnabled ? "destructive" : "default"} 
-                      size="sm"
-                      onClick={() => setSecurity({ ...security, twoFactorEnabled: !security.twoFactorEnabled })}
-                    >
-                      {security.twoFactorEnabled ? 'Disable' : 'Enable'}
-                    </Button>
+                    <Button variant="outline" size="sm" disabled>Enable</Button>
                   </div>
                 </div>
 

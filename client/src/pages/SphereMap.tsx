@@ -1,130 +1,67 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Globe, 
-  MapPin, 
-  Users, 
-  Star, 
-  TrendingUp, 
-  Award,
-  BookOpen,
-  Code,
-  Zap,
-  Target,
-  Brain,
-  Rocket
-} from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Globe, MapPin, Users, Star, TrendingUp, Award, Code, Zap, Target, Brain, Rocket } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 
-interface LearningPath {
-  id: string;
+interface Roadmap {
+  id: number;
   title: string;
   description: string;
-  progress: number;
-  difficulty: 'beginner' | 'intermediate' | 'advanced';
-  skills: string[];
-  estimatedTime: string;
-  icon: any;
-  color: string;
+  category: string;
+  difficulty: string;
+  estimatedTime: string | null;
+  modules: { id: string; title: string; completed: boolean }[];
 }
 
-interface GlobalStats {
-  totalLearners: number;
-  completedProjects: number;
-  skillsLearned: number;
-  countriesActive: number;
+interface UserProgress {
+  roadmapId: number;
+  progressPercentage: number;
+  completedModules: string[];
 }
+
+const ICONS: Record<string, any> = {
+  'Frontend Developer': Code,
+  'Backend Developer': Brain,
+  'Full Stack Developer': Rocket,
+  'Data Science': Zap,
+  'DevOps Engineer': Target,
+};
+
+const COLORS: Record<string, string> = {
+  'Frontend Developer': 'from-blue-500 to-cyan-500',
+  'Backend Developer': 'from-green-500 to-emerald-500',
+  'Full Stack Developer': 'from-purple-500 to-pink-500',
+  'Data Science': 'from-orange-500 to-red-500',
+  'DevOps Engineer': 'from-indigo-500 to-blue-600',
+};
+
+const DIFF_COLORS: Record<string, string> = {
+  Beginner: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+  Intermediate: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+  Advanced: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+};
 
 export function SphereMap() {
-  const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  const { user } = useAuth();
+  const [selectedPath, setSelectedPath] = useState<number | null>(null);
 
-  const learningPaths: LearningPath[] = [
-    {
-      id: 'frontend',
-      title: 'Frontend Development',
-      description: 'Master modern web development with React, Vue, and Angular',
-      progress: 65,
-      difficulty: 'intermediate',
-      skills: ['React', 'JavaScript', 'CSS', 'HTML', 'TypeScript'],
-      estimatedTime: '3-6 months',
-      icon: Code,
-      color: 'from-blue-500 to-cyan-500'
-    },
-    {
-      id: 'backend',
-      title: 'Backend Engineering',
-      description: 'Build scalable server-side applications and APIs',
-      progress: 40,
-      difficulty: 'advanced',
-      skills: ['Node.js', 'Python', 'Databases', 'API Design', 'Cloud'],
-      estimatedTime: '4-8 months',
-      icon: Brain,
-      color: 'from-green-500 to-emerald-500'
-    },
-    {
-      id: 'data-science',
-      title: 'Data Science & AI',
-      description: 'Explore machine learning, AI, and data analytics',
-      progress: 25,
-      difficulty: 'advanced',
-      skills: ['Python', 'Machine Learning', 'Statistics', 'TensorFlow', 'SQL'],
-      estimatedTime: '6-12 months',
-      icon: Zap,
-      color: 'from-purple-500 to-pink-500'
-    },
-    {
-      id: 'mobile',
-      title: 'Mobile Development',
-      description: 'Create native and cross-platform mobile applications',
-      progress: 80,
-      difficulty: 'intermediate',
-      skills: ['React Native', 'Flutter', 'iOS', 'Android', 'Firebase'],
-      estimatedTime: '4-7 months',
-      icon: Rocket,
-      color: 'from-orange-500 to-red-500'
-    },
-    {
-      id: 'cybersecurity',
-      title: 'Cybersecurity',
-      description: 'Learn ethical hacking, security analysis, and protection',
-      progress: 15,
-      difficulty: 'advanced',
-      skills: ['Network Security', 'Penetration Testing', 'Cryptography', 'Risk Assessment'],
-      estimatedTime: '6-10 months',
-      icon: Target,
-      color: 'from-gray-600 to-gray-800'
-    },
-    {
-      id: 'devops',
-      title: 'DevOps & Cloud',
-      description: 'Master infrastructure, deployment, and cloud technologies',
-      progress: 55,
-      difficulty: 'intermediate',
-      skills: ['Docker', 'Kubernetes', 'AWS', 'CI/CD', 'Terraform'],
-      estimatedTime: '3-6 months',
-      icon: Globe,
-      color: 'from-indigo-500 to-blue-600'
-    }
-  ];
+  const { data: roadmaps = [], isLoading } = useQuery<Roadmap[]>({
+    queryKey: ['/api/roadmaps'],
+  });
 
-  const globalStats: GlobalStats = {
-    totalLearners: 847293,
-    completedProjects: 156847,
-    skillsLearned: 2847,
-    countriesActive: 195
-  };
+  // Fetch progress for all roadmaps if logged in
+  const { data: allProgress = [] } = useQuery<UserProgress[]>({
+    queryKey: [`/api/users/${user?.id}/all-progress`],
+    enabled: false, // We'll fetch per-roadmap lazily
+  });
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case 'beginner': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-      case 'intermediate': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
-      case 'advanced': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
-    }
-  };
+  const getProgress = (roadmapId: number) => 0; // Will be populated when user opens a roadmap
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -133,165 +70,125 @@ export function SphereMap() {
           CodeSphere Learning Map
         </h1>
         <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-          Navigate your learning journey through interconnected skill paths and track your global progress
+          Navigate your learning journey through interconnected skill paths
         </p>
       </div>
 
-      {/* Global Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <Card>
-          <CardContent className="p-4 text-center">
-            <Users className="h-8 w-8 text-blue-500 mx-auto mb-2" />
-            <div className="text-2xl font-bold">{globalStats.totalLearners.toLocaleString()}</div>
-            <div className="text-sm text-muted-foreground">Active Learners</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <Award className="h-8 w-8 text-green-500 mx-auto mb-2" />
-            <div className="text-2xl font-bold">{globalStats.completedProjects.toLocaleString()}</div>
-            <div className="text-sm text-muted-foreground">Projects Completed</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <Star className="h-8 w-8 text-yellow-500 mx-auto mb-2" />
-            <div className="text-2xl font-bold">{globalStats.skillsLearned.toLocaleString()}</div>
-            <div className="text-sm text-muted-foreground">Skills Mastered</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <Globe className="h-8 w-8 text-purple-500 mx-auto mb-2" />
-            <div className="text-2xl font-bold">{globalStats.countriesActive}</div>
-            <div className="text-sm text-muted-foreground">Countries Active</div>
-          </CardContent>
-        </Card>
+      {/* Stats from real data */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card><CardContent className="p-4 text-center">
+          <Globe className="h-8 w-8 text-blue-500 mx-auto mb-2" />
+          <div className="text-2xl font-bold">{(roadmaps as Roadmap[]).length}</div>
+          <div className="text-sm text-muted-foreground">Learning Paths</div>
+        </CardContent></Card>
+        <Card><CardContent className="p-4 text-center">
+          <Target className="h-8 w-8 text-green-500 mx-auto mb-2" />
+          <div className="text-2xl font-bold">
+            {(roadmaps as Roadmap[]).reduce((acc, r) => acc + r.modules.length, 0)}
+          </div>
+          <div className="text-sm text-muted-foreground">Total Modules</div>
+        </CardContent></Card>
+        <Card><CardContent className="p-4 text-center">
+          <Star className="h-8 w-8 text-yellow-500 mx-auto mb-2" />
+          <div className="text-2xl font-bold">
+            {(roadmaps as Roadmap[]).filter(r => r.difficulty === 'Beginner').length}
+          </div>
+          <div className="text-sm text-muted-foreground">Beginner Paths</div>
+        </CardContent></Card>
+        <Card><CardContent className="p-4 text-center">
+          <Award className="h-8 w-8 text-purple-500 mx-auto mb-2" />
+          <div className="text-2xl font-bold">
+            {(roadmaps as Roadmap[]).filter(r => r.difficulty === 'Advanced').length}
+          </div>
+          <div className="text-sm text-muted-foreground">Advanced Paths</div>
+        </CardContent></Card>
       </div>
 
-      <Tabs defaultValue="paths" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+      <Tabs defaultValue="paths">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="paths">Learning Paths</TabsTrigger>
-          <TabsTrigger value="progress">My Progress</TabsTrigger>
           <TabsTrigger value="global">Global Map</TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="paths">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {learningPaths.map((path) => {
-              const IconComponent = path.icon;
-              return (
-                <Card 
-                  key={path.id} 
-                  className="cursor-pointer hover:shadow-lg transition-all duration-300 hover:scale-105"
-                  onClick={() => setSelectedPath(path.id)}
-                >
-                  <CardHeader className="pb-3">
-                    <div className={`w-12 h-12 rounded-lg bg-gradient-to-r ${path.color} flex items-center justify-center mb-3`}>
-                      <IconComponent className="h-6 w-6 text-white" />
-                    </div>
-                    <CardTitle className="text-lg font-bold">{path.title}</CardTitle>
-                    <Badge className={getDifficultyColor(path.difficulty)} variant="secondary">
-                      {path.difficulty}
-                    </Badge>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-muted-foreground text-sm mb-4">{path.description}</p>
-                    
-                    <div className="space-y-3">
-                      <div>
-                        <div className="flex justify-between text-sm mb-1">
-                          <span>Progress</span>
-                          <span className="font-semibold">{path.progress}%</span>
-                        </div>
-                        <Progress value={path.progress} className="h-2" />
+          {isLoading ? (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
+              {[...Array(5)].map((_, i) => <Card key={i}><CardContent className="p-6"><Skeleton className="h-48 w-full" /></CardContent></Card>)}
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
+              {(roadmaps as Roadmap[]).map(path => {
+                const Icon = ICONS[path.title] || Code;
+                const color = COLORS[path.title] || 'from-gray-500 to-gray-600';
+                const progress = getProgress(path.id);
+                return (
+                  <Card key={path.id} className="cursor-pointer hover:shadow-lg transition-all hover:scale-105"
+                    onClick={() => setSelectedPath(selectedPath === path.id ? null : path.id)}>
+                    <CardContent className="p-6">
+                      <div className={`w-12 h-12 rounded-lg bg-gradient-to-r ${color} flex items-center justify-center mb-3`}>
+                        <Icon className="h-6 w-6 text-white" />
                       </div>
-                      
-                      <div>
-                        <div className="text-sm font-medium mb-2">Key Skills:</div>
-                        <div className="flex flex-wrap gap-1">
-                          {path.skills.slice(0, 3).map((skill) => (
-                            <Badge key={skill} variant="outline" className="text-xs">
-                              {skill}
-                            </Badge>
+                      <h3 className="text-lg font-bold mb-1">{path.title}</h3>
+                      <Badge className={DIFF_COLORS[path.difficulty] || ''} variant="secondary">
+                        {path.difficulty}
+                      </Badge>
+                      <p className="text-muted-foreground text-sm my-3 line-clamp-2">{path.description}</p>
+
+                      <div className="space-y-2 text-sm mb-4">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Modules</span>
+                          <span className="font-medium">{path.modules.length}</span>
+                        </div>
+                        {path.estimatedTime && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Duration</span>
+                            <span className="font-medium">{path.estimatedTime}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {progress > 0 && (
+                        <div className="mb-3">
+                          <div className="flex justify-between text-xs mb-1">
+                            <span>Progress</span><span>{progress}%</span>
+                          </div>
+                          <Progress value={progress} className="h-2" />
+                        </div>
+                      )}
+
+                      {selectedPath === path.id && (
+                        <div className="mt-3 border-t pt-3 space-y-1">
+                          {path.modules.map(m => (
+                            <div key={m.id} className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <div className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                              {m.title}
+                            </div>
                           ))}
-                          {path.skills.length > 3 && (
-                            <Badge variant="outline" className="text-xs">
-                              +{path.skills.length - 3} more
-                            </Badge>
-                          )}
                         </div>
-                      </div>
-                      
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">Duration:</span>
-                        <span className="font-medium">{path.estimatedTime}</span>
-                      </div>
-                    </div>
-                    
-                    <Button className="w-full mt-4" variant={path.progress > 0 ? "default" : "outline"}>
-                      {path.progress > 0 ? "Continue Learning" : "Start Path"}
-                    </Button>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
+                      )}
+
+                      <Button className="w-full mt-4" variant={progress > 0 ? 'default' : 'outline'}>
+                        {progress > 0 ? 'Continue Learning' : 'Start Path'}
+                      </Button>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
         </TabsContent>
-        
-        <TabsContent value="progress">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <TrendingUp className="h-5 w-5" />
-                <span>Your Learning Journey</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                {learningPaths.filter(path => path.progress > 0).map((path) => {
-                  const IconComponent = path.icon;
-                  return (
-                    <div key={path.id} className="flex items-center space-x-4 p-4 border rounded-lg">
-                      <div className={`w-10 h-10 rounded-lg bg-gradient-to-r ${path.color} flex items-center justify-center`}>
-                        <IconComponent className="h-5 w-5 text-white" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-2">
-                          <h3 className="font-semibold">{path.title}</h3>
-                          <span className="text-sm font-medium">{path.progress}%</span>
-                        </div>
-                        <Progress value={path.progress} className="h-2" />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
+
         <TabsContent value="global">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <MapPin className="h-5 w-5" />
-                <span>Global Learning Activity</span>
-              </CardTitle>
-            </CardHeader>
+          <Card className="mt-4">
+            <CardHeader><CardTitle className="flex items-center gap-2"><MapPin className="h-5 w-5" />Global Learning Activity</CardTitle></CardHeader>
             <CardContent>
-              <div className="h-96 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg flex items-center justify-center">
+              <div className="h-80 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg flex items-center justify-center">
                 <div className="text-center">
                   <Globe className="h-16 w-16 text-blue-500 mx-auto mb-4 animate-pulse" />
                   <h3 className="text-xl font-semibold mb-2">Interactive World Map</h3>
-                  <p className="text-muted-foreground max-w-md">
-                    Explore real-time learning activity from students around the world. 
-                    See popular courses, trending skills, and connect with the global CodeSphere community.
+                  <p className="text-muted-foreground max-w-md text-sm">
+                    Real-time global learning activity visualization — coming in Phase 4.
                   </p>
-                  <Button className="mt-4">
-                    <BookOpen className="mr-2 h-4 w-4" />
-                    Explore Global Trends
-                  </Button>
                 </div>
               </div>
             </CardContent>

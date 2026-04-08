@@ -1,63 +1,41 @@
 import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { 
-  TrendingUp, 
-  Flame, 
-  Target, 
-  Calendar,
-  BarChart3,
-  PieChart,
-  Activity,
-  Clock,
-  CheckCircle,
-  BookOpen,
-  Code,
-  Star,
-  Zap,
-  Trophy
-} from 'lucide-react';
-
-interface LearningPath {
-  id: string;
-  name: string;
-  progress: number;
-  totalLessons: number;
-  completedLessons: number;
-  category: string;
-  lastAccessed: Date;
-}
-
-interface Project {
-  id: string;
-  name: string;
-  status: 'completed' | 'in-progress' | 'planned';
-  completionDate?: Date;
-  xpEarned: number;
-  technologies: string[];
-}
-
-interface StreakData {
-  currentStreak: number;
-  longestStreak: number;
-  totalDays: number;
-  weeklyData: number[];
-}
+import { TrendingUp, Flame, Target, Calendar, BarChart3, Activity, Clock, CheckCircle, Code, Star, Trophy } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 
 export function ProgressTracker() {
+  const { user } = useAuth();
   const [selectedTimeframe, setSelectedTimeframe] = useState('week');
 
+  const { data: solutions = [] } = useQuery<any[]>({
+    queryKey: [`/api/users/${user?.id}/solutions`],
+    enabled: !!user && user.id > 0,
+  });
+
+  const { data: analytics = [] } = useQuery<any[]>({
+    queryKey: [`/api/users/${user?.id}/analytics`],
+    enabled: !!user && user.id > 0,
+  });
+
+  if (!user) return null;
+
+  const solvedCount = (solutions as any[]).filter((s: any) => s.isCorrect).length;
+  const nextLevelXP = user.level * 1000;
+  const progressPercentage = Math.min((user.xp / nextLevelXP) * 100, 100);
+  const totalStudyMinutes = (analytics as any[]).reduce((s: number, r: any) => s + r.studyTimeMinutes, 0);
+  const studyHours = Math.floor(totalStudyMinutes / 60);
+
   const userStats = {
-    level: 8,
-    xp: 4250,
-    nextLevelXP: 5000,
-    totalXP: 12500,
-    problemsSolved: 156,
-    coursesCompleted: 12,
-    projectsBuilt: 8,
-    studyTime: 248, // hours
+    level: user.level,
+    xp: user.xp,
+    nextLevelXP,
+    streak: user.streak,
+    problemsSolved: solvedCount,
+    studyTime: studyHours,
     joinDate: new Date('2023-08-15')
   };
 

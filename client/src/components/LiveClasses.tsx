@@ -72,7 +72,6 @@ export function LiveClasses() {
   });
 
   const handleInfoClick = (classItem: LiveClass) => {
-    console.log('Class Details:', classItem);
     alert(`Live Class Details:\nTitle: ${classItem.title}\nInstructor: ${classItem.instructor}\nDate: ${classItem.date}\nTime: ${classItem.time}\nAttendees: ${classItem.attendees}\nStatus: ${classItem.status}\n\nDescription: ${classItem.description}`);
   };
 

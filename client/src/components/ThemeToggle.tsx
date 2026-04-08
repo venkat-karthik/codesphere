@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Sun, Moon, Monitor, Star, Code, Zap, Leaf, Waves, Sunset, SquareDot, Sparkles, Minus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { useTheme } from '../contexts/ThemeContext';
+import { useTheme } from '@/contexts/ThemeContext';
 
 const themeOptions = [
   { value: 'light', label: 'Light', icon: Sun },

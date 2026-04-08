@@ -41,72 +41,34 @@ interface NotificationsProviderProps {
 export function NotificationsProvider({ children }: NotificationsProviderProps) {
   const [notifications, setNotifications] = useState<Notification[]>([
     {
-      id: '1',
-      type: 'assignment',
-      title: 'New Assignment Available',
-      message: 'Complete the "Binary Search Implementation" problem to earn 150 XP',
-      timestamp: new Date('2024-01-21T10:30:00'),
-      read: false,
-      priority: 'high',
-      actionUrl: '/problems'
-    },
-    {
-      id: '2',
-      type: 'ai-mentor',
-      title: 'AI Mentor Suggestion',
-      message: 'Based on your progress, I recommend trying the "Advanced React Patterns" course next',
-      timestamp: new Date('2024-01-21T09:15:00'),
-      read: false,
-      priority: 'medium',
-      actionUrl: '/roadmaps'
-    },
-    {
-      id: '3',
-      type: 'achievement',
-      title: 'Achievement Unlocked!',
-      message: 'Congratulations! You\'ve earned the "Code Warrior" badge for solving 100 problems',
-      timestamp: new Date('2024-01-20T16:45:00'),
-      read: true,
-      priority: 'medium'
-    },
-    {
-      id: '4',
-      type: 'message',
-      title: 'New Message from Mentor',
-      message: 'Great work on your latest project! Let\'s schedule a review session',
-      timestamp: new Date('2024-01-20T14:20:00'),
-      read: false,
-      priority: 'medium',
-      sender: 'Sarah Chen'
-    },
-    {
-      id: '5',
-      type: 'reminder',
-      title: 'Daily Learning Reminder',
-      message: 'Don\'t forget to maintain your streak! Complete at least one problem today',
-      timestamp: new Date('2024-01-21T08:00:00'),
-      read: true,
-      priority: 'low'
-    },
-    {
-      id: '6',
+      id: 'welcome',
       type: 'system',
-      title: 'System Maintenance',
-      message: 'Scheduled maintenance on January 22nd, 2:00-4:00 AM UTC. Services may be temporarily unavailable',
-      timestamp: new Date('2024-01-20T12:00:00'),
-      read: true,
-      priority: 'low'
+      title: 'Welcome to CodeSphere!',
+      message: 'Start your learning journey — explore roadmaps, solve problems, and join live classes.',
+      timestamp: new Date(),
+      read: false,
+      priority: 'medium',
     },
     {
-      id: '7',
-      type: 'live-class',
-      title: 'Live Class Starting Soon',
-      message: 'JavaScript Fundamentals live class starts in 15 minutes. Join now!',
-      timestamp: new Date('2024-01-21T11:45:00'),
+      id: 'daily-problem',
+      type: 'reminder',
+      title: 'Daily Problem Available',
+      message: 'A new daily coding challenge is ready. Solve it to earn XP and maintain your streak!',
+      timestamp: new Date(),
       read: false,
       priority: 'high',
-      actionUrl: '/live-classes'
-    }
+      actionUrl: '/problems',
+    },
+    {
+      id: 'live-class',
+      type: 'live-class',
+      title: 'Live Classes This Week',
+      message: 'JavaScript Fundamentals and React Hooks Deep Dive sessions are scheduled. Check the schedule!',
+      timestamp: new Date(),
+      read: false,
+      priority: 'medium',
+      actionUrl: '/live-classes',
+    },
   ]);
 
   const unreadCount = notifications.filter(n => !n.read).length;

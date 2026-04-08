@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LoginInstructions } from './LoginInstructions';
+import { ForgotPasswordModal } from './ForgotPasswordModal';
 
 interface AuthModalsProps {
   isOpen: boolean;
@@ -17,6 +18,7 @@ export function AuthModals({ isOpen, mode, onClose, onSwitchMode }: AuthModalsPr
   const { login, register } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showForgot, setShowForgot] = useState(false);
 
   const [loginData, setLoginData] = useState({
     email: '',
@@ -35,20 +37,14 @@ export function AuthModals({ isOpen, mode, onClose, onSwitchMode }: AuthModalsPr
     e.preventDefault();
     setLoading(true);
     setError('');
-
-    try {
-      const success = await login(loginData.email, loginData.password);
-      if (success) {
-        onClose();
-        setLoginData({ email: '', password: '' });
-      } else {
-        setError('Invalid email or password');
-      }
-    } catch (err) {
-      setError('Login failed. Please try again.');
-    } finally {
-      setLoading(false);
+    const result = await login(loginData.email, loginData.password);
+    if (result.success) {
+      onClose();
+      setLoginData({ email: '', password: '' });
+    } else {
+      setError(result.message || 'Invalid email or password');
     }
+    setLoading(false);
   };
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -62,37 +58,20 @@ export function AuthModals({ isOpen, mode, onClose, onSwitchMode }: AuthModalsPr
       return;
     }
 
-    try {
-      const success = await register({
-        firstName: registerData.firstName,
-        lastName: registerData.lastName,
-        email: registerData.email,
-        role: 'student',
-        level: 1,
-        xp: 0,
-        nextLevelXP: 100,
-        streak: 0,
-        completedCourses: 0,
-        problemsSolved: 0
-      });
+    const result = await register({
+      firstName: registerData.firstName,
+      lastName: registerData.lastName,
+      email: registerData.email,
+      password: registerData.password,
+    });
 
-      if (success) {
-        onClose();
-        setRegisterData({
-          firstName: '',
-          lastName: '',
-          email: '',
-          password: '',
-          confirmPassword: ''
-        });
-      } else {
-        setError('Email already exists or registration failed');
-      }
-    } catch (err) {
-      setError('Registration failed. Please try again.');
-    } finally {
-      setLoading(false);
+    if (result.success) {
+      onClose();
+      setRegisterData({ firstName: '', lastName: '', email: '', password: '', confirmPassword: '' });
+    } else {
+      setError(result.message || 'Registration failed');
     }
+    setLoading(false);
   };
 
   if (!isOpen) return null;
@@ -119,11 +98,11 @@ export function AuthModals({ isOpen, mode, onClose, onSwitchMode }: AuthModalsPr
 
             {/* Collapsible Demo Accounts */}
             <details className="mb-4">
-              <summary className="cursor-pointer text-cs-primary text-sm mb-2">Show Demo Accounts</summary>
-              <div className="mt-2 bg-cs-sidebar rounded-lg p-2 border border-cs-primary/30">
-                <div className="text-xs">
-                  <LoginInstructions />
-                </div>
+              <summary className="cursor-pointer text-cs-primary text-sm mb-2 select-none">
+                ▸ Try Demo Accounts
+              </summary>
+              <div className="mt-2 rounded-lg p-2">
+                <LoginInstructions onFill={(email, password) => setLoginData({ email, password })} />
               </div>
             </details>
 
@@ -160,6 +139,13 @@ export function AuthModals({ isOpen, mode, onClose, onSwitchMode }: AuthModalsPr
               </Button>
             </form>
 
+            <div className="text-center mt-2">
+              <button onClick={() => setShowForgot(true)}
+                className="text-xs text-muted-foreground hover:text-primary transition-colors">
+                Forgot password?
+              </button>
+            </div>
+
             <div className="text-center mt-4">
               <span className="text-cs-body text-xs">No account? </span>
               <button
@@ -170,8 +156,7 @@ export function AuthModals({ isOpen, mode, onClose, onSwitchMode }: AuthModalsPr
               </button>
             </div>
           </div>
-        ) : (
-          <div className="p-8">
+        ) : (          <div className="p-8">
             <div className="text-center mb-6">
               <div className="w-16 h-16 bg-primary rounded-xl flex items-center justify-center mx-auto mb-4">
                 <span className="text-primary-foreground font-bold text-xl">CS</span>
@@ -258,6 +243,8 @@ export function AuthModals({ isOpen, mode, onClose, onSwitchMode }: AuthModalsPr
           </div>
         )}
       </div>
+
+      <ForgotPasswordModal isOpen={showForgot} onClose={() => setShowForgot(false)} />
     </div>
   );
 }

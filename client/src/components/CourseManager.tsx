@@ -325,7 +325,6 @@ export function CourseManager() {
   });
 
   const createCourse = () => {
-    console.log('Creating new course');
     setShowCreateModal(false);
   };
 

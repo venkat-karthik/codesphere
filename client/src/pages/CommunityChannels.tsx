@@ -1,571 +1,383 @@
-import { useState, useRef, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
-import { 
-  Hash,
-  Volume2,
-  Lock,
-  Settings,
-  UserPlus,
-  Send,
-  Smile,
-  Paperclip,
-  Users,
-  Plus,
-  Search,
-  MoreHorizontal,
-  Pin,
-  Reply,
-  Edit,
-  Trash2
-} from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Hash, Volume2, Lock, Settings, Users, Plus, Send, Smile } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { apiRequest } from '@/lib/queryClient';
+import { io, Socket } from 'socket.io-client';
+
+// ── Types ──────────────────────────────────────────────────────────────────
 
 interface Channel {
-  id: string;
+  id: number;
   name: string;
   type: 'text' | 'voice';
-  description?: string;
+  description: string | null;
   memberCount: number;
   isPrivate: boolean;
-  category: string;
 }
 
 interface Message {
-  id: string;
-  author: {
-    name: string;
-    avatar: string;
-    role: 'admin' | 'student' | 'moderator';
-    level: number;
-  };
+  id: number | string;
+  channelId: number;
+  channelName: string;
+  userId: number;
+  userName: string;
   content: string;
-  timestamp: Date;
-  reactions: { emoji: string; count: number; users: string[] }[];
-  replies?: Message[];
-  edited?: boolean;
-  pinned?: boolean;
+  createdAt: string;
 }
 
+interface TypingUser {
+  userId: number;
+  userName: string;
+}
+
+// ── Component ──────────────────────────────────────────────────────────────
+
 export function CommunityChannels() {
-  const [selectedChannel, setSelectedChannel] = useState<string>('general');
-  const [newMessage, setNewMessage] = useState('');
+  const { user } = useAuth();
+  const qc = useQueryClient();
+
+  const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState('');
+  const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const [connected, setConnected] = useState(false);
   const [showNewChannelModal, setShowNewChannelModal] = useState(false);
   const [newChannelName, setNewChannelName] = useState('');
   const [newChannelType, setNewChannelType] = useState<'text' | 'voice'>('text');
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Mock channels data
-  const channels: Channel[] = [
-    {
-      id: 'general',
-      name: 'general',
-      type: 'text',
-      description: 'General discussions',
-      memberCount: 245,
-      isPrivate: false,
-      category: 'General'
-    },
-    {
-      id: 'help',
-      name: 'help',
-      type: 'text',
-      description: 'Get help with coding problems',
-      memberCount: 189,
-      isPrivate: false,
-      category: 'General'
-    },
-    {
-      id: 'announcements',
-      name: 'announcements',
-      type: 'text',
-      description: 'Important updates and news',
-      memberCount: 298,
-      isPrivate: false,
-      category: 'General'
-    },
-    {
-      id: 'javascript',
-      name: 'javascript',
-      type: 'text',
-      description: 'JavaScript discussions',
-      memberCount: 156,
-      isPrivate: false,
-      category: 'Programming'
-    },
-    {
-      id: 'python',
-      name: 'python',
-      type: 'text',
-      description: 'Python programming help',
-      memberCount: 134,
-      isPrivate: false,
-      category: 'Programming'
-    },
-    {
-      id: 'react',
-      name: 'react',
-      type: 'text',
-      description: 'React development',
-      memberCount: 98,
-      isPrivate: false,
-      category: 'Programming'
-    },
-    {
-      id: 'study-group',
-      name: 'Study Group',
-      type: 'voice',
-      description: 'Voice chat for study sessions',
-      memberCount: 24,
-      isPrivate: false,
-      category: 'Study'
-    },
-    {
-      id: 'office-hours',
-      name: 'Office Hours',
-      type: 'voice',
-      description: 'Live help with instructors',
-      memberCount: 12,
-      isPrivate: false,
-      category: 'Study'
-    }
-  ];
+  // ── Fetch channels ─────────────────────────────────────────────────────
+  const { data: channels = [] } = useQuery<Channel[]>({
+    queryKey: ['/api/community/channels'],
+  });
 
-  // Mock messages data
-  const messages: Message[] = [
-    {
-      id: '1',
-      author: {
-        name: 'Alex Johnson',
-        avatar: 'AJ',
-        role: 'admin',
-        level: 10
-      },
-      content: 'Welcome to CodeSphere Community! 🎉 This is where we collaborate, share knowledge, and help each other grow as developers.',
-      timestamp: new Date('2024-01-20T10:00:00'),
-      reactions: [
-        { emoji: '👋', count: 12, users: ['user1', 'user2'] },
-        { emoji: '🎉', count: 8, users: ['user3', 'user4'] }
-      ],
-      pinned: true
-    },
-    {
-      id: '2',
-      author: {
-        name: 'Sarah Chen',
-        avatar: 'SC',
-        role: 'moderator',
-        level: 8
-      },
-      content: 'Just finished the React roadmap! The project-based learning approach is incredible. Has anyone started the advanced patterns section yet?',
-      timestamp: new Date('2024-01-20T14:30:00'),
-      reactions: [
-        { emoji: '🚀', count: 5, users: ['user5', 'user6'] },
-        { emoji: '💪', count: 3, users: ['user7'] }
-      ]
-    },
-    {
-      id: '3',
-      author: {
-        name: 'Mike Rodriguez',
-        avatar: 'MR',
-        role: 'student',
-        level: 3
-      },
-      content: 'Quick question about the JavaScript fundamentals - can someone explain closures in simple terms? The examples in the course are helpful but I want to make sure I understand it correctly.',
-      timestamp: new Date('2024-01-20T15:45:00'),
-      reactions: [
-        { emoji: '🤔', count: 2, users: ['user8'] }
-      ],
-      replies: [
-        {
-          id: '3a',
-          author: {
-            name: 'Emma Davis',
-            avatar: 'ED',
-            role: 'student',
-            level: 6
-          },
-          content: 'Think of closures like a backpack that a function carries around. It has access to all the variables from its "home" scope, even when the function travels to other parts of your code!',
-          timestamp: new Date('2024-01-20T15:50:00'),
-          reactions: [
-            { emoji: '💡', count: 4, users: ['user9', 'user10'] }
-          ]
-        }
-      ]
-    },
-    {
-      id: '4',
-      author: {
-        name: 'Lisa Wang',
-        avatar: 'LW',
-        role: 'student',
-        level: 5
-      },
-      content: 'Just deployed my first full-stack project using the MERN stack! 🎯 The deployment guide in the resources section was super helpful. Thanks to everyone who helped in the #help channel!',
-      timestamp: new Date('2024-01-20T16:20:00'),
-      reactions: [
-        { emoji: '🎯', count: 7, users: ['user11', 'user12'] },
-        { emoji: '🔥', count: 4, users: ['user13'] }
-      ]
-    }
-  ];
-
-  const channelCategories = Array.from(new Set(channels.map(ch => ch.category)));
-
-  const selectedChannelData = channels.find(ch => ch.id === selectedChannel);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
+  // Set default channel once loaded
   useEffect(() => {
-    scrollToBottom();
+    if ((channels as Channel[]).length > 0 && !selectedChannel) {
+      setSelectedChannel((channels as Channel[])[0]);
+    }
+  }, [channels]);
+
+  // ── Socket.io connection ───────────────────────────────────────────────
+  useEffect(() => {
+    if (!user) return;
+
+    const s = io('/chat', {
+      auth: { userId: user.id, userName: `${user.firstName} ${user.lastName}` },
+      transports: ['websocket', 'polling'],
+    });
+
+    s.on('connect', () => setConnected(true));
+    s.on('disconnect', () => setConnected(false));
+
+    s.on('new-message', (msg: Message) => {
+      setMessages(prev => {
+        // Avoid duplicates
+        if (prev.some(m => m.id === msg.id)) return prev;
+        return [...prev, msg];
+      });
+    });
+
+    s.on('user-typing', ({ userId, userName, isTyping }: { userId: number; userName: string; isTyping: boolean }) => {
+      if (userId === user.id) return;
+      setTypingUsers(prev =>
+        isTyping
+          ? prev.some(u => u.userId === userId) ? prev : [...prev, { userId, userName }]
+          : prev.filter(u => u.userId !== userId)
+      );
+    });
+
+    setSocket(s);
+    return () => { s.disconnect(); };
+  }, [user]);
+
+  // ── Join channel room when selection changes ───────────────────────────
+  useEffect(() => {
+    if (!socket || !selectedChannel) return;
+
+    // Leave previous, join new
+    socket.emit('join-channel', selectedChannel.name);
+
+    // Load message history from DB
+    fetch(`/api/community/channels/${selectedChannel.id}/messages?limit=50`, { credentials: 'include' })
+      .then(r => r.json())
+      .then((history: any[]) => {
+        setMessages(history.map(m => ({
+          id: m.id,
+          channelId: m.channelId,
+          channelName: selectedChannel.name,
+          userId: m.userId,
+          userName: m.userName || `User #${m.userId}`,
+          content: m.content,
+          createdAt: m.createdAt,
+        })));
+      })
+      .catch(() => setMessages([]));
+
+    setTypingUsers([]);
+
+    return () => { socket.emit('leave-channel', selectedChannel.name); };
+  }, [socket, selectedChannel?.id]);
+
+  // ── Auto-scroll ────────────────────────────────────────────────────────
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSendMessage = () => {
-    if (newMessage.trim()) {
-      console.log('Sending message:', newMessage);
-      setNewMessage('');
-    }
-  };
+  // ── Send message ───────────────────────────────────────────────────────
+  const sendMessage = useCallback(() => {
+    if (!input.trim() || !socket || !selectedChannel || !user) return;
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+    socket.emit('send-message', {
+      channelName: selectedChannel.name,
+      channelId: selectedChannel.id,
+      content: input.trim(),
+    });
+
+    setInput('');
+    // Stop typing indicator
+    socket.emit('typing', { channelName: selectedChannel.name, isTyping: false });
+  }, [input, socket, selectedChannel, user]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSendMessage();
+      sendMessage();
     }
   };
 
-  const getRoleColor = (role: string) => {
-    switch (role) {
-      case 'admin': return 'text-red-400';
-      case 'moderator': return 'text-blue-400';
-      case 'student': return 'text-green-400';
-      default: return 'text-gray-400';
-    }
+  // ── Typing indicator ───────────────────────────────────────────────────
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInput(e.target.value);
+    if (!socket || !selectedChannel) return;
+
+    socket.emit('typing', { channelName: selectedChannel.name, isTyping: true });
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => {
+      socket.emit('typing', { channelName: selectedChannel.name, isTyping: false });
+    }, 2000);
   };
 
-  const getRoleBadge = (role: string) => {
-    switch (role) {
-      case 'admin': return 'bg-red-500/20 text-red-400';
-      case 'moderator': return 'bg-blue-500/20 text-blue-400';
-      case 'student': return 'bg-green-500/20 text-green-400';
-      default: return 'bg-gray-500/20 text-gray-400';
-    }
-  };
+  // ── Create channel ─────────────────────────────────────────────────────
+  const createChannel = useMutation({
+    mutationFn: async () => {
+      await apiRequest('POST', '/api/community/channels', {
+        name: newChannelName.trim().toLowerCase().replace(/\s+/g, '-'),
+        type: newChannelType,
+      });
+    },
+    onSuccess: () => {
+      setNewChannelName('');
+      setShowNewChannelModal(false);
+      qc.invalidateQueries({ queryKey: ['/api/community/channels'] });
+    },
+  });
 
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
+  const textChannels = (channels as Channel[]).filter(c => c.type === 'text');
+  const voiceChannels = (channels as Channel[]).filter(c => c.type === 'voice');
+
+  const formatTime = (d: string) => new Date(d).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  const getInitials = (name: string) => name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] bg-background">
-      {/* Channel Sidebar */}
-      <div className="w-64 bg-muted/30 border-r border-border flex flex-col">
-        {/* Server Header */}
-        <div className="p-4 border-b border-border">
-          <div className="flex items-center justify-between">
-            <h2 className="font-bold text-lg">CodeSphere Community</h2>
-            <Dialog open={showNewChannelModal} onOpenChange={setShowNewChannelModal}>
-              <DialogTrigger asChild>
-                <Button size="sm" variant="ghost">
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Create New Channel</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <Input
-                    placeholder="Channel name"
-                    value={newChannelName}
-                    onChange={(e) => setNewChannelName(e.target.value)}
-                  />
-                  <div className="flex space-x-2">
-                    <Button
-                      variant={newChannelType === 'text' ? 'default' : 'outline'}
-                      onClick={() => setNewChannelType('text')}
-                      className="flex-1"
-                    >
-                      <Hash className="mr-2 h-4 w-4" />
-                      Text
-                    </Button>
-                    <Button
-                      variant={newChannelType === 'voice' ? 'default' : 'outline'}
-                      onClick={() => setNewChannelType('voice')}
-                      className="flex-1"
-                    >
-                      <Volume2 className="mr-2 h-4 w-4" />
-                      Voice
-                    </Button>
-                  </div>
-                  <Button className="w-full" onClick={() => setShowNewChannelModal(false)}>
-                    Create Channel
+    <div className="flex h-[calc(100vh-4rem)] bg-background overflow-hidden">
+
+      {/* ── Channel Sidebar ─────────────────────────────────────────── */}
+      <div className="w-52 md:w-60 bg-muted/30 border-r flex flex-col shrink-0 hidden sm:flex">
+        <div className="p-4 border-b flex items-center justify-between">
+          <h2 className="font-bold text-sm">CodeSphere Community</h2>
+          <Dialog open={showNewChannelModal} onOpenChange={setShowNewChannelModal}>
+            <DialogTrigger asChild>
+              <Button size="sm" variant="ghost"><Plus className="h-4 w-4" /></Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle>Create Channel</DialogTitle></DialogHeader>
+              <div className="space-y-4 pt-2">
+                <Input placeholder="channel-name" value={newChannelName}
+                  onChange={e => setNewChannelName(e.target.value)} />
+                <div className="flex gap-2">
+                  <Button variant={newChannelType === 'text' ? 'default' : 'outline'} className="flex-1"
+                    onClick={() => setNewChannelType('text')}>
+                    <Hash className="mr-2 h-4 w-4" />Text
+                  </Button>
+                  <Button variant={newChannelType === 'voice' ? 'default' : 'outline'} className="flex-1"
+                    onClick={() => setNewChannelType('voice')}>
+                    <Volume2 className="mr-2 h-4 w-4" />Voice
                   </Button>
                 </div>
-              </DialogContent>
-            </Dialog>
-          </div>
+                <Button className="w-full" disabled={!newChannelName.trim() || createChannel.isPending}
+                  onClick={() => createChannel.mutate()}>
+                  {createChannel.isPending ? 'Creating...' : 'Create'}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
 
-        {/* Channels List */}
         <ScrollArea className="flex-1">
-          <div className="p-2">
-            {channelCategories.map((category) => (
-              <div key={category} className="mb-4">
-                <div className="flex items-center justify-between px-2 py-1 mb-2">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                    {category}
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  {channels
-                    .filter((channel) => channel.category === category)
-                    .map((channel) => (
-                      <button
-                        key={channel.id}
-                        onClick={() => setSelectedChannel(channel.id)}
-                        className={`w-full flex items-center space-x-2 px-2 py-1.5 rounded text-left hover:bg-muted/50 transition-colors ${
-                          selectedChannel === channel.id ? 'bg-muted text-foreground' : 'text-muted-foreground'
-                        }`}
-                      >
-                        {channel.type === 'text' ? (
-                          <Hash className="h-4 w-4" />
-                        ) : (
-                          <Volume2 className="h-4 w-4" />
-                        )}
-                        <span className="flex-1 text-sm font-medium">{channel.name}</span>
-                        {channel.isPrivate && <Lock className="h-3 w-3" />}
-                      </button>
-                    ))}
-                </div>
+          <div className="p-2 space-y-4">
+            {textChannels.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-2 mb-1">Text Channels</p>
+                {textChannels.map(ch => (
+                  <button key={ch.id} onClick={() => setSelectedChannel(ch)}
+                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm transition-colors ${selectedChannel?.id === ch.id ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/50'}`}>
+                    <Hash className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{ch.name}</span>
+                    {ch.isPrivate && <Lock className="h-3 w-3 ml-auto" />}
+                  </button>
+                ))}
               </div>
-            ))}
+            )}
+            {voiceChannels.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-2 mb-1">Voice Channels</p>
+                {voiceChannels.map(ch => (
+                  <button key={ch.id} onClick={() => setSelectedChannel(ch)}
+                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm transition-colors ${selectedChannel?.id === ch.id ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/50'}`}>
+                    <Volume2 className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{ch.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </ScrollArea>
 
-        {/* User Info */}
-        <div className="p-3 border-t border-border">
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-semibold">
-              JD
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-medium">John Doe</p>
-              <p className="text-xs text-muted-foreground">Level 5 Student</p>
-            </div>
-            <Button size="sm" variant="ghost">
-              <Settings className="h-4 w-4" />
-            </Button>
+        {/* User info */}
+        <div className="p-3 border-t flex items-center gap-2">
+          <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-semibold shrink-0">
+            {user ? getInitials(`${user.firstName} ${user.lastName}`) : '?'}
           </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate">{user ? `${user.firstName} ${user.lastName}` : 'Guest'}</p>
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <span className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-gray-400'}`} />
+              {connected ? 'Online' : 'Offline'}
+            </p>
+          </div>
+          <Button size="sm" variant="ghost"><Settings className="h-4 w-4" /></Button>
         </div>
       </div>
 
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col">
-        {/* Channel Header */}
-        <div className="p-4 border-b border-border">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              {selectedChannelData?.type === 'text' ? (
-                <Hash className="h-5 w-5 text-muted-foreground" />
-              ) : (
-                <Volume2 className="h-5 w-5 text-muted-foreground" />
+      {/* ── Main Chat Area ───────────────────────────────────────────── */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Header */}
+        <div className="p-4 border-b flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2">
+            {selectedChannel?.type === 'text'
+              ? <Hash className="h-5 w-5 text-muted-foreground" />
+              : <Volume2 className="h-5 w-5 text-muted-foreground" />}
+            <div>
+              <h3 className="font-semibold">{selectedChannel?.name || 'Select a channel'}</h3>
+              {selectedChannel?.description && (
+                <p className="text-xs text-muted-foreground">{selectedChannel.description}</p>
               )}
-              <div>
-                <h3 className="font-semibold">{selectedChannelData?.name}</h3>
-                <p className="text-xs text-muted-foreground">{selectedChannelData?.description}</p>
-              </div>
             </div>
-            <div className="flex items-center space-x-2">
-              <Badge variant="secondary" className="text-xs">
-                <Users className="mr-1 h-3 w-3" />
-                {selectedChannelData?.memberCount} members
-              </Badge>
-              <Button size="sm" variant="ghost">
-                <Search className="h-4 w-4" />
-              </Button>
-              <Button size="sm" variant="ghost">
-                <UserPlus className="h-4 w-4" />
-              </Button>
-            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="text-xs">
+              <Users className="mr-1 h-3 w-3" />
+              {messages.length} messages
+            </Badge>
           </div>
         </div>
 
         {/* Messages */}
         <ScrollArea className="flex-1 p-4">
-          <div className="space-y-4">
-            {messages.map((message) => (
-              <div key={message.id} className="group">
-                <div className="flex items-start space-x-3">
-                  <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-semibold">
-                    {message.author.avatar}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-baseline space-x-2 mb-1">
-                      <span className={`font-semibold text-sm ${getRoleColor(message.author.role)}`}>
-                        {message.author.name}
-                      </span>
-                      <Badge className={`text-xs px-1.5 py-0.5 ${getRoleBadge(message.author.role)}`}>
-                        {message.author.role}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">
-                        Level {message.author.level}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {formatTime(message.timestamp)}
-                      </span>
-                      {message.edited && (
-                        <span className="text-xs text-muted-foreground">(edited)</span>
-                      )}
-                      {message.pinned && (
-                        <Pin className="h-3 w-3 text-yellow-500" />
-                      )}
-                    </div>
-                    <div className="text-sm text-foreground mb-2">{message.content}</div>
-                    
-                    {/* Reactions */}
-                    {message.reactions && message.reactions.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mb-2">
-                        {message.reactions.map((reaction, index) => (
-                          <button
-                            key={index}
-                            className="flex items-center space-x-1 px-2 py-1 bg-muted/50 rounded-full text-xs hover:bg-muted transition-colors"
-                          >
-                            <span>{reaction.emoji}</span>
-                            <span>{reaction.count}</span>
-                          </button>
-                        ))}
-                        <button className="px-2 py-1 bg-muted/30 rounded-full text-xs hover:bg-muted transition-colors opacity-0 group-hover:opacity-100">
-                          <Smile className="h-3 w-3" />
-                        </button>
-                      </div>
-                    )}
+          {!selectedChannel ? (
+            <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+              Select a channel to start chatting
+            </div>
+          ) : messages.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-center">
+              <Hash className="h-12 w-12 text-muted-foreground mb-3" />
+              <p className="font-semibold">Welcome to #{selectedChannel.name}!</p>
+              <p className="text-sm text-muted-foreground mt-1">This is the beginning of the channel. Say hello!</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {messages.map((msg, idx) => {
+                const isMe = msg.userId === user?.id;
+                const prevMsg = messages[idx - 1];
+                const showHeader = !prevMsg || prevMsg.userId !== msg.userId ||
+                  new Date(msg.createdAt).getTime() - new Date(prevMsg.createdAt).getTime() > 5 * 60 * 1000;
 
-                    {/* Replies */}
-                    {message.replies && message.replies.length > 0 && (
-                      <div className="mt-2 border-l-2 border-muted pl-3 space-y-2">
-                        {message.replies.map((reply) => (
-                          <div key={reply.id} className="flex items-start space-x-2">
-                            <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-semibold">
-                              {reply.author.avatar}
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex items-baseline space-x-2 mb-1">
-                                <span className={`font-semibold text-xs ${getRoleColor(reply.author.role)}`}>
-                                  {reply.author.name}
-                                </span>
-                                <span className="text-xs text-muted-foreground">
-                                  {formatTime(reply.timestamp)}
-                                </span>
-                              </div>
-                              <div className="text-xs text-foreground">{reply.content}</div>
-                            </div>
-                          </div>
-                        ))}
+                return (
+                  <div key={msg.id} className={`flex items-start gap-3 group ${isMe ? 'flex-row-reverse' : ''}`}>
+                    {showHeader && (
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 ${isMe ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                        {getInitials(msg.userName)}
                       </div>
                     )}
+                    {!showHeader && <div className="w-8 shrink-0" />}
+                    <div className={`max-w-[70%] ${isMe ? 'items-end' : 'items-start'} flex flex-col`}>
+                      {showHeader && (
+                        <div className={`flex items-baseline gap-2 mb-0.5 ${isMe ? 'flex-row-reverse' : ''}`}>
+                          <span className="text-sm font-semibold">{isMe ? 'You' : msg.userName}</span>
+                          <span className="text-xs text-muted-foreground">{formatTime(msg.createdAt)}</span>
+                        </div>
+                      )}
+                      <div className={`px-3 py-2 rounded-2xl text-sm break-words ${isMe ? 'bg-primary text-primary-foreground rounded-tr-sm' : 'bg-muted rounded-tl-sm'}`}>
+                        {msg.content}
+                      </div>
+                    </div>
                   </div>
-                  
-                  {/* Message Actions */}
-                  <div className="opacity-0 group-hover:opacity-100 flex items-center space-x-1">
-                    <Button size="sm" variant="ghost" className="h-6 w-6 p-0">
-                      <Reply className="h-3 w-3" />
-                    </Button>
-                    <Button size="sm" variant="ghost" className="h-6 w-6 p-0">
-                      <Smile className="h-3 w-3" />
-                    </Button>
-                    <Button size="sm" variant="ghost" className="h-6 w-6 p-0">
-                      <MoreHorizontal className="h-3 w-3" />
-                    </Button>
+                );
+              })}
+
+              {/* Typing indicator */}
+              {typingUsers.length > 0 && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <div className="flex gap-0.5">
+                    <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                   </div>
+                  {typingUsers.map(u => u.userName).join(', ')} {typingUsers.length === 1 ? 'is' : 'are'} typing...
                 </div>
-              </div>
-            ))}
-            <div ref={messagesEndRef} />
-          </div>
+              )}
+
+              <div ref={messagesEndRef} />
+            </div>
+          )}
         </ScrollArea>
 
-        {/* Message Input */}
-        <div className="p-4 border-t border-border">
-          <div className="flex items-end space-x-2">
-            <div className="flex-1 relative">
-              <Textarea
-                placeholder={`Message #${selectedChannelData?.name}`}
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                onKeyPress={handleKeyPress}
-                className="min-h-[40px] max-h-32 resize-none pr-12"
-                rows={1}
+        {/* Input */}
+        <div className="p-4 border-t shrink-0">
+          {!user ? (
+            <p className="text-sm text-muted-foreground text-center">Sign in to send messages</p>
+          ) : selectedChannel?.type === 'voice' ? (
+            <p className="text-sm text-muted-foreground text-center">Voice channels don't support text chat</p>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Input
+                placeholder={`Message #${selectedChannel?.name || '...'}`}
+                value={input}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyDown}
+                disabled={!connected || !selectedChannel}
+                className="flex-1"
               />
-              <div className="absolute right-2 bottom-2 flex items-center space-x-1">
-                <Button size="sm" variant="ghost" className="h-6 w-6 p-0">
-                  <Paperclip className="h-3 w-3" />
-                </Button>
-                <Button size="sm" variant="ghost" className="h-6 w-6 p-0">
-                  <Smile className="h-3 w-3" />
-                </Button>
-              </div>
+              <Button size="icon" onClick={sendMessage}
+                disabled={!input.trim() || !connected || !selectedChannel}>
+                <Send className="h-4 w-4" />
+              </Button>
             </div>
-            <Button 
-              onClick={handleSendMessage}
-              disabled={!newMessage.trim()}
-              className="shrink-0"
-            >
-              <Send className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="text-xs text-muted-foreground mt-1">
-            Press Enter to send, Shift+Enter for new line
-          </div>
-        </div>
-      </div>
-
-      {/* Members Sidebar */}
-      <div className="w-48 bg-muted/30 border-l border-border">
-        <div className="p-3">
-          <h4 className="text-sm font-semibold text-muted-foreground mb-3">
-            ONLINE — {selectedChannelData?.memberCount}
-          </h4>
-          <div className="space-y-2">
-            <div className="flex items-center space-x-2 p-1 rounded hover:bg-muted/50 cursor-pointer">
-              <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-semibold">
-                AJ
-              </div>
-              <div className="flex-1">
-                <p className="text-xs font-medium">Alex Johnson</p>
-                <p className="text-xs text-red-400">Admin</p>
-              </div>
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-            </div>
-            <div className="flex items-center space-x-2 p-1 rounded hover:bg-muted/50 cursor-pointer">
-              <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-semibold">
-                SC
-              </div>
-              <div className="flex-1">
-                <p className="text-xs font-medium">Sarah Chen</p>
-                <p className="text-xs text-blue-400">Moderator</p>
-              </div>
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-            </div>
-            <div className="flex items-center space-x-2 p-1 rounded hover:bg-muted/50 cursor-pointer">
-              <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-xs font-semibold">
-                MR
-              </div>
-              <div className="flex-1">
-                <p className="text-xs font-medium">Mike Rodriguez</p>
-                <p className="text-xs text-green-400">Student</p>
-              </div>
-              <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-            </div>
-          </div>
+          )}
+          {!connected && user && (
+            <p className="text-xs text-muted-foreground mt-1 text-center">Connecting to chat...</p>
+          )}
         </div>
       </div>
     </div>

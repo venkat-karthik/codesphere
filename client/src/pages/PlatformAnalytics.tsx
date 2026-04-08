@@ -1,570 +1,443 @@
 import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { 
-  BarChart3, 
-  TrendingUp, 
-  TrendingDown, 
-  Users, 
-  Clock, 
-  Target, 
-  Star,
-  BookOpen,
-  Code,
-  Calendar,
-  Activity,
-  PieChart,
-  LineChart,
-  Award,
-  Zap,
-  Flame,
-  CheckCircle,
-  AlertCircle,
-  Download,
-  Filter,
-  Eye
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import {
+  BarChart3, TrendingUp, TrendingDown, Users, DollarSign,
+  ShoppingCart, Activity, Download, Search, Trash2, User, Plus, BookOpen, Code
 } from 'lucide-react';
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+} from 'recharts';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { apiRequest } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
 
-interface LearningMetric {
-  id: string;
-  name: string;
-  value: number;
-  previousValue: number;
-  change: number;
-  trend: 'up' | 'down' | 'stable';
-  unit: string;
-  icon: any;
-}
-
-interface CourseProgress {
-  id: string;
-  name: string;
-  progress: number;
-  enrolledStudents: number;
-  completionRate: number;
-  averageScore: number;
-  category: string;
-}
-
-interface StudentPerformance {
-  id: string;
-  name: string;
+interface AdminUser {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string;
   level: number;
   xp: number;
-  coursesCompleted: number;
-  problemsSolved: number;
   streak: number;
-  lastActive: Date;
-  performance: 'excellent' | 'good' | 'average' | 'needs-improvement';
+  subscriptionType: string;
+  totalStudyTime: number;
 }
 
-interface TimeSeriesData {
-  date: string;
-  activeUsers: number;
-  newRegistrations: number;
-  completedLessons: number;
-  problemsSolved: number;
-}
+const revenueData = [
+  { month: 'Jan', revenue: 4000, expenses: 2400 },
+  { month: 'Feb', revenue: 3000, expenses: 1398 },
+  { month: 'Mar', revenue: 5000, expenses: 6800 },
+  { month: 'Apr', revenue: 4780, expenses: 3908 },
+  { month: 'May', revenue: 6890, expenses: 4800 },
+  { month: 'Jun', revenue: 7390, expenses: 3800 },
+];
 
-interface EngagementData {
-  category: string;
-  value: number;
-  percentage: number;
-  color: string;
+const subscriptionData = [
+  { name: 'Jan', Pro: 400, Premium: 240 },
+  { name: 'Feb', Pro: 300, Premium: 139 },
+  { name: 'Mar', Pro: 200, Premium: 480 },
+  { name: 'Apr', Pro: 278, Premium: 390 },
+  { name: 'May', Pro: 189, Premium: 480 },
+  { name: 'Jun', Pro: 239, Premium: 380 },
+];
+
+const kpiData = {
+    mrr: { value: 7390, change: 12.5, period: "last month" },
+    activeSubscriptions: { value: 619, change: 5.2, period: "last month" },
+    arpu: { value: 11.94, change: 2.1, period: "last month" },
+    churnRate: { value: 2.3, change: -0.5, period: "last month" },
+    ltv: { value: 245, change: 15, period: "last year" },
+    cac: { value: 42, change: 3, period: "last month" },
 }
 
 export function PlatformAnalytics() {
-  const [selectedTimeframe, setSelectedTimeframe] = useState('week');
-  const [selectedMetric, setSelectedMetric] = useState('overview');
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const [selectedTab, setSelectedTab] = useState('overview');
+  const [searchTerm, setSearchTerm] = useState('');
 
-  const learningMetrics: LearningMetric[] = [
-    {
-      id: '1',
-      name: 'Active Learners',
-      value: 1247,
-      previousValue: 1189,
-      change: 4.9,
-      trend: 'up',
-      unit: 'users',
-      icon: Users
-    },
-    {
-      id: '2',
-      name: 'Course Completions',
-      value: 89,
-      previousValue: 76,
-      change: 17.1,
-      trend: 'up',
-      unit: 'courses',
-      icon: BookOpen
-    },
-    {
-      id: '3',
-      name: 'Problems Solved',
-      value: 2341,
-      previousValue: 2187,
-      change: 7.0,
-      trend: 'up',
-      unit: 'problems',
-      icon: Code
-    },
-    {
-      id: '4',
-      name: 'Average Study Time',
-      value: 2.8,
-      previousValue: 3.1,
-      change: -9.7,
-      trend: 'down',
-      unit: 'hours/day',
-      icon: Clock
-    },
-    {
-      id: '5',
-      name: 'Retention Rate',
-      value: 87.3,
-      previousValue: 85.2,
-      change: 2.5,
-      trend: 'up',
-      unit: '%',
-      icon: Target
-    },
-    {
-      id: '6',
-      name: 'Satisfaction Score',
-      value: 4.6,
-      previousValue: 4.5,
-      change: 2.2,
-      trend: 'up',
-      unit: '/5',
-      icon: Star
-    }
-  ];
+  // Problem creation form
+  const [showProblemModal, setShowProblemModal] = useState(false);
+  const [problemForm, setProblemForm] = useState({ title: '', description: '', difficulty: 'Easy', category: 'Arrays', xpReward: '100', hints: '', solution: '' });
 
-  const courseProgress: CourseProgress[] = [
-    {
-      id: '1',
-      name: 'JavaScript Fundamentals',
-      progress: 92,
-      enrolledStudents: 456,
-      completionRate: 78.5,
-      averageScore: 87.2,
-      category: 'Frontend'
-    },
-    {
-      id: '2',
-      name: 'React Development',
-      progress: 85,
-      enrolledStudents: 389,
-      completionRate: 72.1,
-      averageScore: 84.6,
-      category: 'Frontend'
-    },
-    {
-      id: '3',
-      name: 'Node.js Backend',
-      progress: 78,
-      enrolledStudents: 234,
-      completionRate: 68.9,
-      averageScore: 81.3,
-      category: 'Backend'
-    },
-    {
-      id: '4',
-      name: 'Database Design',
-      progress: 65,
-      enrolledStudents: 198,
-      completionRate: 61.2,
-      averageScore: 79.8,
-      category: 'Backend'
-    },
-    {
-      id: '5',
-      name: 'Advanced Algorithms',
-      progress: 45,
-      enrolledStudents: 123,
-      completionRate: 52.4,
-      averageScore: 76.5,
-      category: 'Computer Science'
-    }
-  ];
+  // Roadmap creation form
+  const [showRoadmapModal, setShowRoadmapModal] = useState(false);
+  const [roadmapForm, setRoadmapForm] = useState({ title: '', description: '', category: 'Web Development', difficulty: 'Beginner', estimatedTime: '' });
 
-  const topPerformers: StudentPerformance[] = [
-    {
-      id: '1',
-      name: 'Alex Johnson',
-      level: 15,
-      xp: 12500,
-      coursesCompleted: 18,
-      problemsSolved: 234,
-      streak: 89,
-      lastActive: new Date('2024-01-21'),
-      performance: 'excellent'
-    },
-    {
-      id: '2',
-      name: 'Sarah Chen',
-      level: 12,
-      xp: 10800,
-      coursesCompleted: 15,
-      problemsSolved: 198,
-      streak: 67,
-      lastActive: new Date('2024-01-21'),
-      performance: 'excellent'
-    },
-    {
-      id: '3',
-      name: 'Mike Rodriguez',
-      level: 11,
-      xp: 9500,
-      coursesCompleted: 12,
-      problemsSolved: 176,
-      streak: 45,
-      lastActive: new Date('2024-01-20'),
-      performance: 'good'
-    },
-    {
-      id: '4',
-      name: 'Emma Wilson',
-      level: 10,
-      xp: 8200,
-      coursesCompleted: 11,
-      problemsSolved: 145,
-      streak: 52,
-      lastActive: new Date('2024-01-21'),
-      performance: 'good'
-    },
-    {
-      id: '5',
-      name: 'David Kim',
-      level: 9,
-      xp: 7800,
-      coursesCompleted: 10,
-      problemsSolved: 132,
-      streak: 38,
-      lastActive: new Date('2024-01-19'),
-      performance: 'average'
-    }
-  ];
+  const { data: users = [], isLoading } = useQuery<AdminUser[]>({
+    queryKey: ['/api/admin/users'],
+  });
 
-  const timeSeriesData: TimeSeriesData[] = [
-    { date: '2024-01-15', activeUsers: 1247, newRegistrations: 23, completedLessons: 156, problemsSolved: 234 },
-    { date: '2024-01-16', activeUsers: 1189, newRegistrations: 18, completedLessons: 142, problemsSolved: 198 },
-    { date: '2024-01-17', activeUsers: 1321, newRegistrations: 31, completedLessons: 178, problemsSolved: 267 },
-    { date: '2024-01-18', activeUsers: 1156, newRegistrations: 15, completedLessons: 134, problemsSolved: 189 },
-    { date: '2024-01-19', activeUsers: 1289, newRegistrations: 27, completedLessons: 167, problemsSolved: 245 },
-    { date: '2024-01-20', activeUsers: 1345, newRegistrations: 34, completedLessons: 189, problemsSolved: 278 },
-    { date: '2024-01-21', activeUsers: 1247, newRegistrations: 22, completedLessons: 145, problemsSolved: 201 }
-  ];
+  const { data: problems = [] } = useQuery<any[]>({
+    queryKey: ['/api/problems'],
+  });
 
-  const engagementData: EngagementData[] = [
-    { category: 'Active Learning', value: 45, percentage: 45, color: 'bg-blue-500' },
-    { category: 'Course Completion', value: 28, percentage: 28, color: 'bg-green-500' },
-    { category: 'Problem Solving', value: 18, percentage: 18, color: 'bg-purple-500' },
-    { category: 'Social Learning', value: 9, percentage: 9, color: 'bg-orange-500' }
-  ];
+  const { data: roadmaps = [] } = useQuery<any[]>({
+    queryKey: ['/api/roadmaps'],
+  });
 
-  const getTrendIcon = (trend: string) => {
-    switch (trend) {
-      case 'up': return <TrendingUp className="h-4 w-4 text-green-500" />;
-      case 'down': return <TrendingDown className="h-4 w-4 text-red-500" />;
-      default: return <Activity className="h-4 w-4 text-gray-500" />;
-    }
+  const deleteUserMutation = useMutation({
+    mutationFn: async (id: number) => { await apiRequest('DELETE', `/api/admin/users/${id}`); },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['/api/admin/users'] }),
+  });
+
+  const createProblemMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest('POST', '/api/admin/problems', {
+        title: problemForm.title,
+        description: problemForm.description,
+        difficulty: problemForm.difficulty,
+        category: problemForm.category,
+        xpReward: parseInt(problemForm.xpReward) || 100,
+        hints: problemForm.hints ? problemForm.hints.split('\n').filter(Boolean) : [],
+        solution: problemForm.solution || null,
+        tags: [],
+        isDaily: false,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['/api/problems'] });
+      setShowProblemModal(false);
+      setProblemForm({ title: '', description: '', difficulty: 'Easy', category: 'Arrays', xpReward: '100', hints: '', solution: '' });
+      toast({ title: 'Problem created' });
+    },
+    onError: () => toast({ title: 'Failed to create problem', variant: 'destructive' }),
+  });
+
+  const createRoadmapMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest('POST', '/api/admin/roadmaps', {
+        title: roadmapForm.title,
+        description: roadmapForm.description,
+        category: roadmapForm.category,
+        difficulty: roadmapForm.difficulty,
+        estimatedTime: roadmapForm.estimatedTime || null,
+        modules: [],
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['/api/roadmaps'] });
+      setShowRoadmapModal(false);
+      setRoadmapForm({ title: '', description: '', category: 'Web Development', difficulty: 'Beginner', estimatedTime: '' });
+      toast({ title: 'Roadmap created' });
+    },
+    onError: () => toast({ title: 'Failed to create roadmap', variant: 'destructive' }),
+  });
+
+  const filteredUsers = (users as AdminUser[]).filter(u =>
+    `${u.firstName} ${u.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    u.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const totalUsers = users.length;
+  const proUsers = (users as AdminUser[]).filter(u => u.subscriptionType === 'pro').length;
+  const premiumUsers = (users as AdminUser[]).filter(u => u.subscriptionType === 'premium').length;
+  const freeUsers = (users as AdminUser[]).filter(u => u.subscriptionType === 'free').length;
+
+  const formatStudyTime = (minutes: number) => {
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return `${h}h ${m}m`;
   };
 
-  const getTrendColor = (trend: string) => {
-    switch (trend) {
-      case 'up': return 'text-green-500';
-      case 'down': return 'text-red-500';
-      default: return 'text-gray-500';
-    }
+  const getSubColor = (type: string) => {
+    if (type === 'pro') return 'bg-purple-500/20 text-purple-400';
+    if (type === 'premium') return 'bg-yellow-500/20 text-yellow-400';
+    return 'bg-gray-500/20 text-gray-400';
   };
 
-  const getPerformanceColor = (performance: string) => {
-    switch (performance) {
-      case 'excellent': return 'bg-green-500/20 text-green-400';
-      case 'good': return 'bg-blue-500/20 text-blue-400';
-      case 'average': return 'bg-yellow-500/20 text-yellow-400';
-      case 'needs-improvement': return 'bg-red-500/20 text-red-400';
-      default: return 'bg-gray-500/20 text-gray-400';
-    }
-  };
-
-  const getProgressColor = (progress: number) => {
-    if (progress >= 80) return 'bg-green-500';
-    if (progress >= 60) return 'bg-yellow-500';
-    if (progress >= 40) return 'bg-orange-500';
-    return 'bg-red-500';
-  };
+  const renderTrend = (change: number) => (
+    <span className={`flex items-center text-sm ${change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+      {change >= 0 ? <TrendingUp className="h-4 w-4 mr-1" /> : <TrendingDown className="h-4 w-4 mr-1" />}
+      {Math.abs(change)}% vs last month
+    </span>
+  );
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <Card className="bg-gradient-to-r from-purple-500/10 to-blue-500/10 border-purple-500/20">
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <BarChart3 className="h-5 w-5 text-purple-500" />
-            <span>Learning Analytics Dashboard</span>
-            <Badge className="bg-purple-500/20 text-purple-400">Real-time</Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">
-            Comprehensive insights into learning patterns, student performance, and platform engagement.
-          </p>
-        </CardContent>
-      </Card>
-
-      {/* Timeframe Selector */}
-      <div className="flex items-center justify-between">
-        <div className="flex space-x-2">
-          {['day', 'week', 'month', 'quarter'].map((timeframe) => (
-            <Button
-              key={timeframe}
-              variant={selectedTimeframe === timeframe ? "default" : "outline"}
-              size="sm"
-              onClick={() => setSelectedTimeframe(timeframe)}
-            >
-              {timeframe.charAt(0).toUpperCase() + timeframe.slice(1)}
-            </Button>
-          ))}
+    <div className="space-y-8 p-8">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold">Admin Panel</h1>
+          <p className="text-muted-foreground">Manage your platform and users.</p>
         </div>
-        <div className="flex items-center space-x-2">
-          <Button variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-2" />
-            Export Report
-          </Button>
-          <Button variant="outline" size="sm">
-            <Filter className="h-4 w-4 mr-2" />
-            Filters
-          </Button>
-        </div>
+        <Button><Download className="mr-2 h-4 w-4" />Export Report</Button>
       </div>
 
-      {/* Key Metrics */}
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {learningMetrics.map((metric) => {
-          const IconComponent = metric.icon;
-          return (
-            <Card key={metric.id} className="hover:shadow-lg transition-all transform hover:-translate-y-1">
-              <CardContent className="p-6 flex flex-col justify-between h-full">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center">
-                    <IconComponent className="h-7 w-7 text-primary" />
-                  </div>
-                  {getTrendIcon(metric.trend)}
+      <Tabs value={selectedTab} onValueChange={setSelectedTab}>
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="overview">Financial Overview</TabsTrigger>
+          <TabsTrigger value="students">User Management ({totalUsers})</TabsTrigger>
+          <TabsTrigger value="content">Content ({(problems as any[]).length + (roadmaps as any[]).length})</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="mt-6">
+          {/* KPI Cards */}
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+            <Card><CardContent className="p-6">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-muted-foreground">Total Users</span>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div className="text-2xl font-bold">{totalUsers}</div>
+              {renderTrend(12.5)}
+            </CardContent></Card>
+            <Card><CardContent className="p-6">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-muted-foreground">Pro Users</span>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div className="text-2xl font-bold">{proUsers}</div>
+              {renderTrend(5.2)}
+            </CardContent></Card>
+            <Card><CardContent className="p-6">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-muted-foreground">Premium Users</span>
+                <Activity className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div className="text-2xl font-bold">{premiumUsers}</div>
+              {renderTrend(3.1)}
+            </CardContent></Card>
+            <Card><CardContent className="p-6">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-muted-foreground">Free Users</span>
+                <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div className="text-2xl font-bold">{freeUsers}</div>
+              {renderTrend(-0.5)}
+            </CardContent></Card>
+          </div>
+
+          <div className="grid lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader><CardTitle>Revenue vs. Expenses</CardTitle></CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={revenueData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" /><YAxis />
+                    <Tooltip /><Legend />
+                    <Line type="monotone" dataKey="revenue" stroke="#8884d8" activeDot={{ r: 8 }} />
+                    <Line type="monotone" dataKey="expenses" stroke="#82ca9d" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle>Subscription Growth</CardTitle></CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={subscriptionData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" /><YAxis />
+                    <Tooltip /><Legend />
+                    <Line type="monotone" dataKey="Pro" stroke="#8884d8" />
+                    <Line type="monotone" dataKey="Premium" stroke="#82ca9d" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="students" className="mt-6 space-y-4">
+          <Card><CardContent className="p-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Search users..." value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)} className="pl-10" />
+            </div>
+          </CardContent></Card>
+
+          <Card>
+            <CardHeader><CardTitle>Users ({filteredUsers.length})</CardTitle></CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="space-y-3">
+                  {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
                 </div>
-                
-                <div className="flex flex-col mb-4">
-                  <div className="text-4xl font-bold mb-1">{metric.value.toLocaleString()}</div>
-                  <div className="text-lg text-muted-foreground font-semibold">{metric.name}</div>
+              ) : filteredUsers.length === 0 ? (
+                <p className="text-muted-foreground text-sm text-center py-8">No users found.</p>
+              ) : (
+                <div className="space-y-3">
+                  {filteredUsers.map(u => (
+                    <div key={u.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/30">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center">
+                          <User className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-semibold">{u.firstName} {u.lastName}</p>
+                          <p className="text-xs text-muted-foreground">{u.email}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-6">
+                        <div className="text-center hidden md:block">
+                          <p className="text-sm font-semibold">Lv {u.level}</p>
+                          <p className="text-xs text-muted-foreground">{u.xp} XP</p>
+                        </div>
+                        <div className="text-center hidden md:block">
+                          <p className="text-sm font-semibold">{u.streak}d</p>
+                          <p className="text-xs text-muted-foreground">Streak</p>
+                        </div>
+                        <div className="text-center hidden lg:block">
+                          <p className="text-sm font-semibold">{formatStudyTime(u.totalStudyTime)}</p>
+                          <p className="text-xs text-muted-foreground">Study</p>
+                        </div>
+                        <Badge className={getSubColor(u.subscriptionType)}>{u.subscriptionType}</Badge>
+                        <Badge variant="outline">{u.role}</Badge>
+                        {u.id > 0 && (
+                          <Button size="sm" variant="ghost" className="text-destructive"
+                            onClick={() => deleteUserMutation.mutate(u.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                
-                <div className="flex items-center space-x-2 text-sm mt-auto">
-                  <span className={`${getTrendColor(metric.trend)} font-semibold`}>
-                    {metric.change > 0 ? '+' : ''}{metric.change}% {metric.trend}
-                  </span>
-                  <span className="text-muted-foreground">vs last {selectedTimeframe}</span>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Content Management Tab */}
+        <TabsContent value="content" className="mt-6 space-y-6">
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Problems */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Code className="h-4 w-4" />Problems ({(problems as any[]).length})
+                </CardTitle>
+                <Button size="sm" onClick={() => setShowProblemModal(true)}>
+                  <Plus className="h-4 w-4 mr-1" />Add
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {(problems as any[]).map((p: any) => (
+                    <div key={p.id} className="flex items-center justify-between p-2 bg-muted/30 rounded text-sm">
+                      <span className="truncate flex-1">{p.title}</span>
+                      <div className="flex items-center gap-2 ml-2 shrink-0">
+                        <Badge variant="outline" className="text-xs">{p.difficulty}</Badge>
+                        <span className="text-xs text-muted-foreground">{p.xpReward}xp</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
-          );
-        })}
-      </div>
 
-      {/* Charts Section */}
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Time Series Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <LineChart className="h-5 w-5" />
-              <span>Activity Trends</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-64 flex items-end justify-between space-x-2">
-              {timeSeriesData.map((data, index) => (
-                <div key={index} className="flex flex-col items-center space-y-2">
-                  <div className="text-xs text-muted-foreground">{data.activeUsers}</div>
-                  <div 
-                    className="bg-primary rounded-t w-8 transition-all hover:bg-primary/80"
-                    style={{ height: `${(data.activeUsers / 1400) * 200}px` }}
-                  />
-                  <div className="text-xs font-medium">
-                    {new Date(data.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-4 grid grid-cols-3 gap-4 text-center">
-              <div>
-                <div className="text-lg font-bold text-blue-500">
-                  {timeSeriesData.reduce((sum, d) => sum + d.newRegistrations, 0)}
-                </div>
-                <div className="text-xs text-muted-foreground">New Users</div>
-              </div>
-              <div>
-                <div className="text-lg font-bold text-green-500">
-                  {timeSeriesData.reduce((sum, d) => sum + d.completedLessons, 0)}
-                </div>
-                <div className="text-xs text-muted-foreground">Lessons Completed</div>
-              </div>
-              <div>
-                <div className="text-lg font-bold text-purple-500">
-                  {timeSeriesData.reduce((sum, d) => sum + d.problemsSolved, 0)}
-                </div>
-                <div className="text-xs text-muted-foreground">Problems Solved</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Engagement Pie Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <PieChart className="h-5 w-5" />
-              <span>Learning Engagement</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-64 flex items-center justify-center">
-              <div className="relative w-32 h-32">
-                <svg className="w-32 h-32 transform -rotate-90">
-                  {engagementData.map((item, index) => {
-                    const total = engagementData.reduce((sum, d) => sum + d.percentage, 0);
-                    const previousPercentages = engagementData
-                      .slice(0, index)
-                      .reduce((sum, d) => sum + d.percentage, 0);
-                    const startAngle = (previousPercentages / total) * 360;
-                    const endAngle = ((previousPercentages + item.percentage) / total) * 360;
-                    
-                    return (
-                      <path
-                        key={item.category}
-                        d={`M 64 64 m -48 0 a 48 48 0 1 1 96 0 a 48 48 0 1 1 -96 0`}
-                        fill="none"
-                        stroke={item.color.replace('bg-', '').replace('-500', '')}
-                        strokeWidth="24"
-                        strokeDasharray={`${(item.percentage / total) * 301.59} 301.59`}
-                        strokeDashoffset={`${(startAngle / 360) * 301.59}`}
-                        className="transition-all"
-                      />
-                    );
-                  })}
-                </svg>
-              </div>
-            </div>
-            <div className="mt-4 space-y-2">
-              {engagementData.map((item) => (
-                <div key={item.category} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <div className={`w-3 h-3 rounded-full ${item.color}`} />
-                    <span className="text-sm">{item.category}</span>
-                  </div>
-                  <span className="text-sm font-semibold">{item.percentage}%</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Course Progress */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <BookOpen className="h-5 w-5" />
-            <span>Course Performance</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {courseProgress.map((course) => (
-              <div key={course.id} className="p-4 border rounded-lg">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <h4 className="font-semibold">{course.name}</h4>
-                    <p className="text-sm text-muted-foreground">{course.category}</p>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-semibold">{course.progress}%</div>
-                    <div className="text-sm text-muted-foreground">
-                      {course.enrolledStudents} students
+            {/* Roadmaps */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <BookOpen className="h-4 w-4" />Roadmaps ({(roadmaps as any[]).length})
+                </CardTitle>
+                <Button size="sm" onClick={() => setShowRoadmapModal(true)}>
+                  <Plus className="h-4 w-4 mr-1" />Add
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {(roadmaps as any[]).map((r: any) => (
+                    <div key={r.id} className="flex items-center justify-between p-2 bg-muted/30 rounded text-sm">
+                      <span className="truncate flex-1">{r.title}</span>
+                      <Badge variant="outline" className="text-xs ml-2 shrink-0">{r.difficulty}</Badge>
                     </div>
-                  </div>
+                  ))}
                 </div>
-                <Progress 
-                  value={course.progress} 
-                  className="h-2 mb-2"
-                  style={{ '--progress-color': getProgressColor(course.progress) } as any}
-                />
-                <div className="flex justify-between text-sm text-muted-foreground">
-                  <span>Completion: {course.completionRate}%</span>
-                  <span>Avg Score: {course.averageScore}%</span>
-                </div>
-              </div>
-            ))}
+              </CardContent>
+            </Card>
           </div>
-        </CardContent>
-      </Card>
+        </TabsContent>
+      </Tabs>
 
-      {/* Top Performers */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Award className="h-5 w-5" />
-            <span>Top Performers</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            {topPerformers.map((student, index) => (
-              <div
-                key={student.id}
-                className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-all"
-              >
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center text-primary font-semibold text-sm">
-                    {index + 1}
-                  </div>
-                  <div>
-                    <div className="flex items-center space-x-2">
-                      <h4 className="font-semibold">{student.name}</h4>
-                      <Badge className={getPerformanceColor(student.performance)}>
-                        {student.performance}
-                      </Badge>
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      Level {student.level} • {student.xp} XP
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex items-center space-x-4 text-sm">
-                  <span className="flex items-center space-x-1">
-                    <BookOpen className="h-3 w-3" />
-                    <span>{student.coursesCompleted}</span>
-                  </span>
-                  <span className="flex items-center space-x-1">
-                    <Code className="h-3 w-3" />
-                    <span>{student.problemsSolved}</span>
-                  </span>
-                  <span className="flex items-center space-x-1">
-                    <Flame className="h-3 w-3" />
-                    <span>{student.streak} days</span>
-                  </span>
-                  <Button size="sm" variant="outline">
-                    <Eye className="h-3 w-3" />
-                  </Button>
-                </div>
+      {/* Create Problem Modal */}
+      <Dialog open={showProblemModal} onOpenChange={setShowProblemModal}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>Create Problem</DialogTitle></DialogHeader>
+          <div className="space-y-3 py-2">
+            <div><Label>Title</Label><Input value={problemForm.title} onChange={e => setProblemForm(f => ({ ...f, title: e.target.value }))} placeholder="Two Sum" /></div>
+            <div><Label>Description</Label><Textarea value={problemForm.description} onChange={e => setProblemForm(f => ({ ...f, description: e.target.value }))} rows={3} placeholder="Given an array..." /></div>
+            <div className="grid grid-cols-3 gap-3">
+              <div><Label>Difficulty</Label>
+                <Select value={problemForm.difficulty} onValueChange={v => setProblemForm(f => ({ ...f, difficulty: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {['Easy','Medium','Hard'].map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
-            ))}
+              <div><Label>Category</Label>
+                <Select value={problemForm.category} onValueChange={v => setProblemForm(f => ({ ...f, category: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {['Arrays','Strings','Dynamic Programming','Trees','Linked Lists','Design','Graphs'].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div><Label>XP Reward</Label><Input type="number" value={problemForm.xpReward} onChange={e => setProblemForm(f => ({ ...f, xpReward: e.target.value }))} /></div>
+            </div>
+            <div><Label>Hints (one per line)</Label><Textarea value={problemForm.hints} onChange={e => setProblemForm(f => ({ ...f, hints: e.target.value }))} rows={2} placeholder="Use a hash map&#10;One pass solution" /></div>
+            <div><Label>Solution Approach</Label><Textarea value={problemForm.solution} onChange={e => setProblemForm(f => ({ ...f, solution: e.target.value }))} rows={2} placeholder="Use a hash map to store..." /></div>
           </div>
-        </CardContent>
-      </Card>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowProblemModal(false)}>Cancel</Button>
+            <Button onClick={() => createProblemMutation.mutate()} disabled={!problemForm.title.trim() || !problemForm.description.trim() || createProblemMutation.isPending}>
+              {createProblemMutation.isPending ? 'Creating...' : 'Create Problem'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Roadmap Modal */}
+      <Dialog open={showRoadmapModal} onOpenChange={setShowRoadmapModal}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>Create Roadmap</DialogTitle></DialogHeader>
+          <div className="space-y-3 py-2">
+            <div><Label>Title</Label><Input value={roadmapForm.title} onChange={e => setRoadmapForm(f => ({ ...f, title: e.target.value }))} placeholder="Mobile Developer" /></div>
+            <div><Label>Description</Label><Textarea value={roadmapForm.description} onChange={e => setRoadmapForm(f => ({ ...f, description: e.target.value }))} rows={3} placeholder="Learn to build mobile apps..." /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label>Category</Label>
+                <Select value={roadmapForm.category} onValueChange={v => setRoadmapForm(f => ({ ...f, category: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {['Web Development','Mobile Development','Data Science','DevOps','Cybersecurity'].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div><Label>Difficulty</Label>
+                <Select value={roadmapForm.difficulty} onValueChange={v => setRoadmapForm(f => ({ ...f, difficulty: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {['Beginner','Intermediate','Advanced'].map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div><Label>Estimated Time (e.g. 3-4 months)</Label><Input value={roadmapForm.estimatedTime} onChange={e => setRoadmapForm(f => ({ ...f, estimatedTime: e.target.value }))} placeholder="3-4 months" /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowRoadmapModal(false)}>Cancel</Button>
+            <Button onClick={() => createRoadmapMutation.mutate()} disabled={!roadmapForm.title.trim() || !roadmapForm.description.trim() || createRoadmapMutation.isPending}>
+              {createRoadmapMutation.isPending ? 'Creating...' : 'Create Roadmap'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
-} 
+}

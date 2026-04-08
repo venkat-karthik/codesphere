@@ -1,133 +1,139 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, AuthState, AuthContextType } from '../types';
-import { storage } from '../lib/storage';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface AuthUser {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: 'admin' | 'student';
+  level: number;
+  xp: number;
+  streak: number;
+  theme: string;
+  subscriptionType: string;
+  totalStudyTime: number;
+  profileImage?: string | null;
+  bio?: string | null;
+  emailVerified?: boolean;
+  codeCoins?: number;
+}
+
+interface AuthContextType {
+  user: AuthUser | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
+  register: (data: RegisterData) => Promise<{ success: boolean; message?: string }>;
+  logout: () => Promise<void>;
+  updateUser: (updates: Partial<AuthUser>) => void;
+}
+
+interface RegisterData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+}
+
+// ─── Context ──────────────────────────────────────────────────────────────────
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [authState, setAuthState] = useState<AuthState>({
-    isAuthenticated: false,
-    user: null
-  });
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [isLoading, setIsLoading] = useState(true); // true until we check session
 
+  // On mount: check if there's an active session
   useEffect(() => {
-    const isAuthenticated = storage.getAuthState();
-    const user = storage.getCurrentUser();
-    
-    if (isAuthenticated && user) {
-      setAuthState({ isAuthenticated: true, user });
-    }
+    checkSession();
   }, []);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const checkSession = async () => {
     try {
-      // Demo accounts for easy testing
-      let user: User | null = null;
-      
-      if (email === 'admin@codesphere.com' && password === 'admin123') {
-        // Admin account
-        user = {
-          id: 'admin1',
-          firstName: 'Admin',
-          lastName: 'User',
-          email,
-          role: 'admin',
-          joinDate: new Date().toISOString(),
-          level: 10,
-          xp: 5000,
-          nextLevelXP: 10000,
-          streak: 30,
-          completedCourses: 15,
-          problemsSolved: 200
-        };
-      } else if (email === 'student@codesphere.com' && password === 'student123') {
-        // Student account
-        user = {
-          id: 'student1',
-          firstName: 'Student',
-          lastName: 'User',
-          email,
-          role: 'student',
-          joinDate: new Date().toISOString(),
-          level: 5,
-          xp: 1250,
-          nextLevelXP: 2000,
-          streak: 7,
-          completedCourses: 3,
-          problemsSolved: 45
-        };
+      const res = await fetch('/api/auth/me', { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setUser(data.user);
       } else {
-        // Check existing users
-        const users = storage.getAllUsers();
-        user = users.find(u => u.email === email) || null;
+        setUser(null);
       }
-      
-      if (user) {
-        storage.setAuthState(true);
-        storage.setCurrentUser(user);
-        setAuthState({ isAuthenticated: true, user });
-        return true;
-      }
-      return false;
-    } catch (error) {
-      console.error('Login error:', error);
-      return false;
+    } catch {
+      setUser(null);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const register = async (userData: Omit<User, 'id' | 'joinDate'>): Promise<boolean> => {
+  const login = async (email: string, password: string) => {
     try {
-      const users = storage.getAllUsers();
-      
-      // Check if email already exists
-      if (users.find(u => u.email === userData.email)) {
-        return false;
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        return { success: false, message: data.message || 'Login failed' };
       }
 
-      const newUser: User = {
-        ...userData,
-        id: Date.now().toString(),
-        joinDate: new Date().toISOString(),
-        level: 1,
-        xp: 0,
-        nextLevelXP: 100,
-        streak: 0,
-        completedCourses: 0,
-        problemsSolved: 0
-      };
-
-      storage.addUser(newUser);
-      storage.setAuthState(true);
-      storage.setCurrentUser(newUser);
-      setAuthState({ isAuthenticated: true, user: newUser });
-      return true;
-    } catch (error) {
-      console.error('Registration error:', error);
-      return false;
+      setUser(data.user);
+      return { success: true };
+    } catch {
+      return { success: false, message: 'Network error. Please try again.' };
     }
   };
 
-  const logout = () => {
-    storage.setAuthState(false);
-    localStorage.removeItem('codesphere_user');
-    setAuthState({ isAuthenticated: false, user: null });
+  const register = async (formData: RegisterData) => {
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(formData),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        return { success: false, message: data.message || 'Registration failed' };
+      }
+
+      setUser(data.user);
+      return { success: true };
+    } catch {
+      return { success: false, message: 'Network error. Please try again.' };
+    }
   };
 
-  const updateUser = (updates: Partial<User>) => {
-    if (authState.user) {
-      const updatedUser = { ...authState.user, ...updates };
-      storage.updateUser(updatedUser);
-      setAuthState(prev => ({ ...prev, user: updatedUser }));
+  const logout = async () => {
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } finally {
+      setUser(null);
     }
+  };
+
+  const updateUser = (updates: Partial<AuthUser>) => {
+    setUser(prev => prev ? { ...prev, ...updates } : null);
   };
 
   return (
-    <AuthContext.Provider value={{ 
-      ...authState, 
-      login, 
-      register, 
-      logout, 
-      updateUser 
+    <AuthContext.Provider value={{
+      user,
+      isAuthenticated: !!user,
+      isLoading,
+      login,
+      register,
+      logout,
+      updateUser,
     }}>
       {children}
     </AuthContext.Provider>
@@ -136,8 +142,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
+  if (!context) throw new Error('useAuth must be used within an AuthProvider');
   return context;
 }

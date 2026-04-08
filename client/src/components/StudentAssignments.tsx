@@ -52,9 +52,6 @@ export function StudentAssignments() {
     };
 
     // Update the assignment context with the submission
-    // This would typically be done through a context or API call
-    console.log('Test submitted:', submission);
-
     setTestModalOpen(false);
     setSelectedAssignment(null);
     setTestAnswers([]);
@@ -77,8 +74,6 @@ export function StudentAssignments() {
     };
 
     // This would typically be done through a context or API call
-    console.log('Assignment submitted:', submission);
-
     setAssignmentModalOpen(false);
     setSelectedAssignment(null);
     setAssignmentFile(null);

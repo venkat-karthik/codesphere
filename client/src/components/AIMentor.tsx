@@ -239,8 +239,6 @@ export function AIMentor() {
 
   const sendMessage = () => {
     if (chatMessage.trim()) {
-      // In a real app, this would send the message to the AI
-      console.log('Sending message:', chatMessage);
       setChatMessage('');
     }
   };

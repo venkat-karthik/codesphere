@@ -1,535 +1,369 @@
 import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { 
-  CreditCard, 
-  Check, 
-  X, 
-  Star, 
-  Crown, 
-  Zap, 
-  Shield, 
-  Users, 
-  BookOpen, 
-  Code, 
-  Headphones, 
-  Infinity,
-  Calendar,
-  Gift,
-  Percent,
-  Clock,
-  Award,
-  TrendingUp,
-  Heart,
-  Lock
-} from 'lucide-react';
-import { useAuth } from '../hooks/useAuth';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Check, X, Star, Crown, BookOpen, Lock, CreditCard, Clock } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { apiRequest } from '@/lib/queryClient';
+
+// ── Types ──────────────────────────────────────────────────────────────────
 
 interface Plan {
   id: string;
   name: string;
-  price: number;
-  billingCycle: 'monthly' | 'yearly';
-  originalPrice?: number;
+  monthlyPrice: number;   // in INR
+  yearlyPrice: number;
   features: string[];
-  limitations?: string[];
+  notIncluded?: string[];
   popular?: boolean;
   icon: any;
   color: string;
-  description: string;
+  subscriptionType: string;
 }
 
-interface PaymentMethod {
-  id: string;
-  type: 'card' | 'paypal' | 'bank';
-  last4?: string;
-  brand?: string;
-  expiryMonth?: number;
-  expiryYear?: number;
-  isDefault: boolean;
+interface PaymentRecord {
+  id: number;
+  amount: string;
+  currency: string;
+  subscriptionType: string;
+  status: string;
+  transactionId: string | null;
+  createdAt: string;
 }
+
+// ── Plans ──────────────────────────────────────────────────────────────────
+
+const PLANS: Plan[] = [
+  {
+    id: 'free',
+    name: 'Free',
+    monthlyPrice: 0,
+    yearlyPrice: 0,
+    subscriptionType: 'free',
+    icon: BookOpen,
+    color: 'text-gray-500',
+    features: ['Basic courses', 'Community forums', 'Basic coding problems', '5 sandbox projects', 'Email support'],
+    notIncluded: ['Premium courses', 'AI code reviews', 'Unlimited projects'],
+  },
+  {
+    id: 'pro',
+    name: 'Pro',
+    monthlyPrice: 1999,
+    yearlyPrice: 19999,
+    subscriptionType: 'premium',
+    popular: true,
+    icon: Star,
+    color: 'text-blue-500',
+    features: [
+      'All Free features', 'Unlimited learning hours', 'Premium courses & tutorials',
+      'Advanced coding challenges', 'Unlimited sandbox projects',
+      'AI-powered code reviews', 'Priority support', 'Downloadable resources',
+      'Progress analytics', '500 CodeCoins/month',
+    ],
+  },
+  {
+    id: 'enterprise',
+    name: 'Enterprise',
+    monthlyPrice: 4999,
+    yearlyPrice: 49999,
+    subscriptionType: 'pro',
+    icon: Crown,
+    color: 'text-purple-500',
+    features: [
+      'All Pro features', 'Team management dashboard', '1-on-1 mentoring sessions',
+      'Custom learning paths', 'Advanced analytics', 'Dedicated account manager',
+      '24/7 support', 'Custom integrations', '2000 CodeCoins/month',
+    ],
+  },
+];
+
+// ── Razorpay loader ────────────────────────────────────────────────────────
+
+function loadRazorpay(): Promise<boolean> {
+  return new Promise(resolve => {
+    if ((window as any).Razorpay) return resolve(true);
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+}
+
+// ── Component ──────────────────────────────────────────────────────────────
 
 export function PaymentIntegration() {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const { toast } = useToast();
-  
-  const [selectedPlan, setSelectedPlan] = useState<string>('pro-monthly');
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
-  const [showPaymentForm, setShowPaymentForm] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [paymentData, setPaymentData] = useState({
-    cardNumber: '',
-    expiryDate: '',
-    cvv: '',
-    name: '',
-    country: 'US',
-    zipCode: ''
+  const qc = useQueryClient();
+  const [billing, setBilling] = useState<'monthly' | 'yearly'>('monthly');
+  const [paying, setPaying] = useState(false);
+
+  const { data: history = [], isLoading: historyLoading } = useQuery<PaymentRecord[]>({
+    queryKey: ['/api/payments/history'],
+    enabled: !!user && user.id > 0,
   });
 
-  const plans: Plan[] = [
-    {
-      id: 'free',
-      name: 'Free',
-      price: 0,
-      billingCycle: 'monthly',
-      features: [
-        'Access to basic courses',
-        'Community forums',
-        'Basic coding problems',
-        '5 sandbox projects',
-        'Email support'
-      ],
-      limitations: [
-        'Limited to 10 hours/month',
-        'No advanced features',
-        'Community support only'
-      ],
-      icon: BookOpen,
-      color: 'text-gray-500',
-      description: 'Perfect for getting started with coding'
+  const createOrderMutation = useMutation({
+    mutationFn: async (planId: string) => {
+      const key = billing === 'yearly' ? `${planId}-yearly` : planId;
+      const res = await apiRequest('POST', '/api/payments/create-order', { plan: key });
+      return res.json();
     },
-    {
-      id: 'pro-monthly',
-      name: 'Pro',
-      price: billingCycle === 'monthly' ? 19.99 : 199.99,
-      originalPrice: billingCycle === 'yearly' ? 239.88 : undefined,
-      billingCycle,
-      features: [
-        'All Free features',
-        'Unlimited learning hours',
-        'Premium courses & tutorials',
-        'Advanced coding challenges',
-        'Unlimited sandbox projects',
-        'AI-powered code reviews',
-        'Priority email support',
-        'Downloadable resources',
-        'Progress analytics'
-      ],
-      popular: true,
-      icon: Star,
-      color: 'text-blue-500',
-      description: 'Best for serious learners and professionals'
+    onSuccess: async (orderData, planId) => {
+      const loaded = await loadRazorpay();
+      if (!loaded) {
+        toast({ title: 'Error', description: 'Failed to load payment gateway.', variant: 'destructive' });
+        return;
+      }
+
+      const options = {
+        key: orderData.keyId,
+        amount: orderData.amount,
+        currency: orderData.currency,
+        name: 'CodeSphere',
+        description: orderData.planLabel,
+        order_id: orderData.orderId,
+        prefill: {
+          name: user ? `${user.firstName} ${user.lastName}` : '',
+          email: user?.email || '',
+        },
+        theme: { color: '#6366f1' },
+        handler: async (response: any) => {
+          setPaying(true);
+          try {
+            const key = billing === 'yearly' ? `${planId}-yearly` : planId;
+            const verifyRes = await apiRequest('POST', '/api/payments/verify', {
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              plan: key,
+            });
+            const data = await verifyRes.json();
+            updateUser({ subscriptionType: data.subscriptionType } as any);
+            qc.invalidateQueries({ queryKey: ['/api/payments/history'] });
+            toast({ title: 'Payment Successful!', description: `You are now on the ${PLANS.find(p => p.id === planId)?.name} plan.` });
+          } catch {
+            toast({ title: 'Verification failed', description: 'Contact support with your payment ID.', variant: 'destructive' });
+          } finally {
+            setPaying(false);
+          }
+        },
+        modal: { ondismiss: () => setPaying(false) },
+      };
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.open();
     },
-    {
-      id: 'enterprise',
-      name: 'Enterprise',
-      price: billingCycle === 'monthly' ? 49.99 : 499.99,
-      originalPrice: billingCycle === 'yearly' ? 599.88 : undefined,
-      billingCycle,
-      features: [
-        'All Pro features',
-        'Team management dashboard',
-        '1-on-1 mentoring sessions',
-        'Custom learning paths',
-        'White-label solutions',
-        'Advanced analytics',
-        'Dedicated account manager',
-        '24/7 phone support',
-        'Custom integrations',
-        'Compliance & security features'
-      ],
-      icon: Crown,
-      color: 'text-purple-500',
-      description: 'Perfect for teams and organizations'
-    }
-  ];
-
-  const paymentMethods: PaymentMethod[] = [
-    {
-      id: '1',
-      type: 'card',
-      last4: '4242',
-      brand: 'Visa',
-      expiryMonth: 12,
-      expiryYear: 2026,
-      isDefault: true
+    onError: (err: any) => {
+      toast({ title: 'Error', description: err.message || 'Failed to initiate payment.', variant: 'destructive' });
     },
-    {
-      id: '2',
-      type: 'card',
-      last4: '1234',
-      brand: 'Mastercard',
-      expiryMonth: 8,
-      expiryYear: 2025,
-      isDefault: false
-    }
-  ];
+  });
 
-  const currentPlan = plans.find(p => p.id === 'free'); // Simulate current plan
+  const currentSub = (user as any)?.subscriptionType || 'free';
+  const currentPlan = PLANS.find(p => p.subscriptionType === currentSub) || PLANS[0];
 
-  const handleUpgrade = (planId: string) => {
-    setSelectedPlan(planId);
-    if (planId !== 'free') {
-      setShowPaymentForm(true);
-    }
-  };
-
-  const processPayment = async () => {
-    setIsProcessing(true);
-    
-    // Simulate payment processing
-    try {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      toast({
-        title: "Payment Successful!",
-        description: `You've successfully upgraded to ${plans.find(p => p.id === selectedPlan)?.name} plan.`,
-      });
-      
-      setShowPaymentForm(false);
-      setIsProcessing(false);
-    } catch (error) {
-      toast({
-        title: "Payment Failed",
-        description: "There was an issue processing your payment. Please try again.",
-        variant: "destructive",
-      });
-      setIsProcessing(false);
-    }
-  };
-
-  const getSavingsPercentage = (originalPrice: number, currentPrice: number) => {
-    return Math.round(((originalPrice - currentPrice) / originalPrice) * 100);
-  };
+  const getPrice = (plan: Plan) => billing === 'yearly' ? plan.yearlyPrice : plan.monthlyPrice;
+  const getSaving = (plan: Plan) => Math.round(((plan.monthlyPrice * 12 - plan.yearlyPrice) / (plan.monthlyPrice * 12)) * 100);
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
+    <div className="max-w-6xl mx-auto space-y-10 py-8">
+
       {/* Header */}
       <div className="text-center space-y-4">
-        <h1 className="text-4xl font-bold">Choose Your Learning Journey</h1>
-        <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-          Unlock premium features and accelerate your coding career with our comprehensive learning platform
-        </p>
-        
-        {/* Billing Toggle */}
-        <div className="flex items-center justify-center space-x-4">
-          <span className={billingCycle === 'monthly' ? 'font-semibold' : 'text-muted-foreground'}>
-            Monthly
-          </span>
-          <Button
-            variant="outline"
-            onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'yearly' : 'monthly')}
-            className="relative"
+        <h1 className="text-4xl font-bold">Choose Your Plan</h1>
+        <p className="text-xl text-muted-foreground">Unlock premium features and accelerate your coding career</p>
+
+        {/* Billing toggle */}
+        <div className="flex items-center justify-center gap-4">
+          <span className={billing === 'monthly' ? 'font-semibold' : 'text-muted-foreground'}>Monthly</span>
+          <button
+            onClick={() => setBilling(b => b === 'monthly' ? 'yearly' : 'monthly')}
+            className={`relative w-12 h-6 rounded-full transition-colors ${billing === 'yearly' ? 'bg-primary' : 'bg-muted'}`}
           >
-            <div className={`w-12 h-6 rounded-full transition-colors ${
-              billingCycle === 'yearly' ? 'bg-primary' : 'bg-muted'
-            }`}>
-              <div className={`w-5 h-5 rounded-full bg-white transition-transform transform ${
-                billingCycle === 'yearly' ? 'translate-x-6' : 'translate-x-0.5'
-              } mt-0.5`} />
-            </div>
-          </Button>
-          <span className={billingCycle === 'yearly' ? 'font-semibold' : 'text-muted-foreground'}>
-            Yearly
-          </span>
-          {billingCycle === 'yearly' && (
-            <Badge className="bg-green-100 text-green-800">Save 20%</Badge>
-          )}
+            <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${billing === 'yearly' ? 'translate-x-6' : 'translate-x-0.5'}`} />
+          </button>
+          <span className={billing === 'yearly' ? 'font-semibold' : 'text-muted-foreground'}>Yearly</span>
+          {billing === 'yearly' && <Badge className="bg-green-100 text-green-800">Save up to 17%</Badge>}
         </div>
       </div>
 
-      {/* Current Plan Status */}
-      {currentPlan && (
-        <Card className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <div className="p-3 bg-white rounded-lg shadow-sm">
-                  <currentPlan.icon className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-lg">Current Plan: {currentPlan.name}</h3>
-                  <p className="text-muted-foreground">
-                    {currentPlan.price === 0 ? 'Free forever' : `$${currentPlan.price}/month`}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-3">
-                <Badge>Active</Badge>
-                <Button variant="outline">Manage Plan</Button>
-              </div>
+      {/* Current plan banner */}
+      <Card className="bg-gradient-to-r from-primary/5 to-purple-500/5 border-primary/20">
+        <CardContent className="p-5 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-background rounded-lg shadow-sm">
+              <currentPlan.icon className={`h-6 w-6 ${currentPlan.color}`} />
             </div>
-          </CardContent>
-        </Card>
-      )}
+            <div>
+              <p className="font-semibold text-lg">Current Plan: {currentPlan.name}</p>
+              <p className="text-muted-foreground text-sm">
+                {currentPlan.monthlyPrice === 0 ? 'Free forever' : `₹${currentPlan.monthlyPrice}/month`}
+              </p>
+            </div>
+          </div>
+          <Badge variant="outline" className="text-green-600 border-green-600">Active</Badge>
+        </CardContent>
+      </Card>
 
-      {/* Pricing Plans */}
+      {/* Plans grid */}
       <div className="grid md:grid-cols-3 gap-8">
-        {plans.map((plan) => (
-          <Card key={plan.id} className={`relative ${
-            plan.popular ? 'ring-2 ring-primary shadow-lg scale-105' : ''
-          } ${selectedPlan === plan.id ? 'ring-2 ring-blue-500' : ''}`}>
-            {plan.popular && (
-              <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                <Badge className="bg-primary text-primary-foreground px-3 py-1">
-                  Most Popular
-                </Badge>
-              </div>
-            )}
-            
-            <CardHeader className="text-center space-y-4">
-              <div className="mx-auto p-3 bg-muted rounded-full w-fit">
-                <plan.icon className={`h-8 w-8 ${plan.color}`} />
-              </div>
-              <div>
+        {PLANS.map(plan => {
+          const price = getPrice(plan);
+          const isCurrentPlan = plan.subscriptionType === currentSub;
+          const isUpgrade = PLANS.indexOf(plan) > PLANS.findIndex(p => p.subscriptionType === currentSub);
+
+          return (
+            <Card key={plan.id} className={`relative flex flex-col ${plan.popular ? 'ring-2 ring-primary shadow-xl scale-105' : ''}`}>
+              {plan.popular && (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                  <Badge className="bg-primary text-primary-foreground px-3">Most Popular</Badge>
+                </div>
+              )}
+
+              <CardHeader className="text-center space-y-3 pb-4">
+                <div className="mx-auto p-3 bg-muted rounded-full w-fit">
+                  <plan.icon className={`h-8 w-8 ${plan.color}`} />
+                </div>
                 <h3 className="text-2xl font-bold">{plan.name}</h3>
-                <p className="text-muted-foreground">{plan.description}</p>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-baseline justify-center space-x-2">
-                  <span className="text-4xl font-bold">
-                    ${plan.price}
-                  </span>
-                  {plan.price > 0 && (
-                    <span className="text-muted-foreground">
-                      /{billingCycle === 'monthly' ? 'month' : 'year'}
+                <div>
+                  <div className="flex items-baseline justify-center gap-1">
+                    <span className="text-4xl font-bold">
+                      {price === 0 ? 'Free' : `₹${price.toLocaleString()}`}
                     </span>
+                    {price > 0 && (
+                      <span className="text-muted-foreground text-sm">/{billing === 'monthly' ? 'mo' : 'yr'}</span>
+                    )}
+                  </div>
+                  {billing === 'yearly' && price > 0 && (
+                    <p className="text-xs text-green-600 mt-1">Save {getSaving(plan)}% vs monthly</p>
                   )}
                 </div>
-                {plan.originalPrice && (
-                  <div className="flex items-center justify-center space-x-2">
-                    <span className="text-sm text-muted-foreground line-through">
-                      ${plan.originalPrice}
-                    </span>
-                    <Badge className="bg-green-100 text-green-800">
-                      Save {getSavingsPercentage(plan.originalPrice, plan.price)}%
-                    </Badge>
-                  </div>
-                )}
-              </div>
-            </CardHeader>
-            
-            <CardContent className="space-y-6">
-              <ul className="space-y-3">
-                {plan.features.map((feature, index) => (
-                  <li key={index} className="flex items-center space-x-3">
-                    <Check className="h-5 w-5 text-green-500" />
-                    <span className="text-sm">{feature}</span>
-                  </li>
-                ))}
-                {plan.limitations?.map((limitation, index) => (
-                  <li key={index} className="flex items-center space-x-3 opacity-60">
-                    <X className="h-5 w-5 text-red-500" />
-                    <span className="text-sm">{limitation}</span>
-                  </li>
-                ))}
-              </ul>
-              
-              <Button 
-                className="w-full"
-                variant={plan.id === currentPlan?.id ? 'outline' : 'default'}
-                disabled={plan.id === currentPlan?.id}
-                onClick={() => handleUpgrade(plan.id)}
-              >
-                {plan.id === currentPlan?.id ? 'Current Plan' : 
-                 plan.price === 0 ? 'Get Started' : 'Upgrade Now'}
-              </Button>
-            </CardContent>
-          </Card>
-        ))}
+              </CardHeader>
+
+              <CardContent className="flex-1 flex flex-col gap-4">
+                <ul className="space-y-2 flex-1">
+                  {plan.features.map((f, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm">
+                      <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
+                      {f}
+                    </li>
+                  ))}
+                  {plan.notIncluded?.map((f, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm opacity-50">
+                      <X className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+
+                <Button
+                  className="w-full"
+                  variant={isCurrentPlan ? 'outline' : 'default'}
+                  disabled={isCurrentPlan || price === 0 || paying || createOrderMutation.isPending}
+                  onClick={() => !isCurrentPlan && price > 0 && createOrderMutation.mutate(plan.id)}
+                >
+                  {paying && createOrderMutation.variables === plan.id ? (
+                    <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />Processing...</>
+                  ) : isCurrentPlan ? 'Current Plan'
+                    : price === 0 ? 'Free Forever'
+                    : `Upgrade to ${plan.name}`}
+                </Button>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
-      {/* Payment Form Modal */}
-      {showPaymentForm && (
-        <Card className="max-w-md mx-auto">
+      {/* Payment History */}
+      {user && user.id > 0 && (
+        <Card>
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <CreditCard className="h-5 w-5" />
-              <span>Complete Your Upgrade</span>
+            <CardTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5" /> Payment History
             </CardTitle>
-            <div className="flex items-center justify-between">
-              <span>Plan: {plans.find(p => p.id === selectedPlan)?.name}</span>
-              <span className="font-bold">
-                ${plans.find(p => p.id === selectedPlan)?.price}/{billingCycle === 'monthly' ? 'mo' : 'yr'}
-              </span>
-            </div>
           </CardHeader>
-          
-          <CardContent className="space-y-6">
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="cardNumber">Card Number</Label>
-                <Input
-                  id="cardNumber"
-                  placeholder="1234 5678 9012 3456"
-                  value={paymentData.cardNumber}
-                  onChange={(e) => setPaymentData(prev => ({ ...prev, cardNumber: e.target.value }))}
-                />
+          <CardContent>
+            {historyLoading ? (
+              <div className="space-y-2">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+            ) : (history as PaymentRecord[]).length === 0 ? (
+              <p className="text-muted-foreground text-sm text-center py-6">No payments yet.</p>
+            ) : (
+              <div className="divide-y">
+                {(history as PaymentRecord[]).map(p => (
+                  <div key={p.id} className="flex items-center justify-between py-3">
+                    <div>
+                      <p className="font-medium capitalize">{p.subscriptionType} Plan</p>
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {new Date(p.createdAt).toLocaleDateString()}
+                        {p.transactionId && ` · ${p.transactionId}`}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold">₹{parseFloat(p.amount).toLocaleString()}</p>
+                      <Badge className={p.status === 'completed' ? 'bg-green-500/20 text-green-600' : p.status === 'failed' ? 'bg-red-500/20 text-red-600' : 'bg-yellow-500/20 text-yellow-600'}>
+                        {p.status}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
               </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="expiry">Expiry Date</Label>
-                  <Input
-                    id="expiry"
-                    placeholder="MM/YY"
-                    value={paymentData.expiryDate}
-                    onChange={(e) => setPaymentData(prev => ({ ...prev, expiryDate: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="cvv">CVV</Label>
-                  <Input
-                    id="cvv"
-                    placeholder="123"
-                    value={paymentData.cvv}
-                    onChange={(e) => setPaymentData(prev => ({ ...prev, cvv: e.target.value }))}
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <Label htmlFor="name">Cardholder Name</Label>
-                <Input
-                  id="name"
-                  placeholder="John Doe"
-                  value={paymentData.name}
-                  onChange={(e) => setPaymentData(prev => ({ ...prev, name: e.target.value }))}
-                />
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="country">Country</Label>
-                  <Input
-                    id="country"
-                    value={paymentData.country}
-                    onChange={(e) => setPaymentData(prev => ({ ...prev, country: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="zip">ZIP Code</Label>
-                  <Input
-                    id="zip"
-                    placeholder="12345"
-                    value={paymentData.zipCode}
-                    onChange={(e) => setPaymentData(prev => ({ ...prev, zipCode: e.target.value }))}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <Separator />
-
-            <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-              <Lock className="h-4 w-4" />
-              <span>Your payment information is secure and encrypted</span>
-            </div>
-
-            <div className="flex space-x-4">
-              <Button 
-                variant="outline" 
-                className="flex-1"
-                onClick={() => setShowPaymentForm(false)}
-                disabled={isProcessing}
-              >
-                Cancel
-              </Button>
-              <Button 
-                className="flex-1"
-                onClick={processPayment}
-                disabled={isProcessing}
-              >
-                {isProcessing ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                    Processing...
-                  </>
-                ) : (
-                  `Pay $${plans.find(p => p.id === selectedPlan)?.price}`
-                )}
-              </Button>
-            </div>
+            )}
           </CardContent>
         </Card>
       )}
 
-      {/* Features Comparison */}
+      {/* Feature comparison */}
       <Card>
         <CardHeader>
           <CardTitle>Feature Comparison</CardTitle>
-          <p className="text-muted-foreground">
-            See what's included with each plan
-          </p>
         </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-4">Features</th>
-                  <th className="text-center py-4">Free</th>
-                  <th className="text-center py-4">Pro</th>
-                  <th className="text-center py-4">Enterprise</th>
+        <CardContent className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left py-3">Feature</th>
+                <th className="text-center py-3">Free</th>
+                <th className="text-center py-3">Pro</th>
+                <th className="text-center py-3">Enterprise</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {[
+                ['Basic Courses', true, true, true],
+                ['Community Access', true, true, true],
+                ['Premium Courses', false, true, true],
+                ['AI Code Reviews', false, true, true],
+                ['Unlimited Projects', false, true, true],
+                ['CodeCoins Monthly', false, true, true],
+                ['1-on-1 Mentoring', false, false, true],
+                ['Team Management', false, false, true],
+                ['Custom Integrations', false, false, true],
+              ].map(([feature, free, pro, ent], i) => (
+                <tr key={i}>
+                  <td className="py-3 font-medium">{feature as string}</td>
+                  {[free, pro, ent].map((v, j) => (
+                    <td key={j} className="text-center py-3">
+                      {v ? <Check className="h-4 w-4 text-green-500 mx-auto" /> : <X className="h-4 w-4 text-red-400 mx-auto" />}
+                    </td>
+                  ))}
                 </tr>
-              </thead>
-              <tbody className="divide-y">
-                {[
-                  { feature: 'Basic Courses', free: true, pro: true, enterprise: true },
-                  { feature: 'Community Access', free: true, pro: true, enterprise: true },
-                  { feature: 'Premium Courses', free: false, pro: true, enterprise: true },
-                  { feature: 'AI Code Reviews', free: false, pro: true, enterprise: true },
-                  { feature: 'Unlimited Projects', free: false, pro: true, enterprise: true },
-                  { feature: '1-on-1 Mentoring', free: false, pro: false, enterprise: true },
-                  { feature: 'Team Management', free: false, pro: false, enterprise: true },
-                  { feature: 'Custom Integrations', free: false, pro: false, enterprise: true }
-                ].map((row, index) => (
-                  <tr key={index}>
-                    <td className="py-4 font-medium">{row.feature}</td>
-                    <td className="text-center py-4">
-                      {row.free ? <Check className="h-5 w-5 text-green-500 mx-auto" /> : <X className="h-5 w-5 text-red-500 mx-auto" />}
-                    </td>
-                    <td className="text-center py-4">
-                      {row.pro ? <Check className="h-5 w-5 text-green-500 mx-auto" /> : <X className="h-5 w-5 text-red-500 mx-auto" />}
-                    </td>
-                    <td className="text-center py-4">
-                      {row.enterprise ? <Check className="h-5 w-5 text-green-500 mx-auto" /> : <X className="h-5 w-5 text-red-500 mx-auto" />}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </CardContent>
       </Card>
 
-      {/* FAQ Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Frequently Asked Questions</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {[
-            {
-              q: "Can I change my plan anytime?",
-              a: "Yes! You can upgrade or downgrade your plan at any time. Changes take effect immediately, and we'll prorate any billing differences."
-            },
-            {
-              q: "What payment methods do you accept?",
-              a: "We accept all major credit cards (Visa, Mastercard, American Express), PayPal, and bank transfers for Enterprise plans."
-            },
-            {
-              q: "Is there a free trial for paid plans?",
-              a: "Yes! All paid plans come with a 14-day free trial. No credit card required to start."
-            },
-            {
-              q: "Can I cancel my subscription?",
-              a: "Absolutely. You can cancel your subscription at any time from your account settings. You'll continue to have access until the end of your billing period."
-            }
-          ].map((faq, index) => (
-            <div key={index} className="space-y-2">
-              <h4 className="font-semibold">{faq.q}</h4>
-              <p className="text-muted-foreground">{faq.a}</p>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+      {/* Security note */}
+      <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+        <Lock className="h-4 w-4" />
+        Payments are processed securely by Razorpay. We never store your card details.
+      </div>
     </div>
   );
 }

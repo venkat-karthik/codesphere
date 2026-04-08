@@ -1,266 +1,108 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { 
-  Trophy, 
-  Medal, 
-  Crown, 
-  Star, 
-  Flame, 
-  Target, 
-  Users, 
-  Search,
-  Filter,
-  TrendingUp,
-  Award,
-  Zap,
-  BookOpen
-} from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Trophy, Flame, Target, Star, Search, Award } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { io } from 'socket.io-client';
 
-interface LeaderboardUser {
-  id: string;
-  name: string;
-  avatar: string;
+interface LeaderboardEntry {
+  id: number;
+  firstName: string;
+  lastName: string;
   level: number;
   xp: number;
   streak: number;
-  problemsSolved: number;
-  coursesCompleted: number;
   rank: number;
-  isCurrentUser: boolean;
-  badge?: string;
-  lastActive: Date;
 }
 
-export function Leaderboard() {
+export function Leaderboard({ className }: { className?: string }) {
+  const { user } = useAuth();
+  const qc = useQueryClient();
   const [selectedCategory, setSelectedCategory] = useState('xp');
   const [searchTerm, setSearchTerm] = useState('');
-  const [timeframe, setTimeframe] = useState('all-time');
 
-  const leaderboardData: LeaderboardUser[] = [
-    {
-      id: '1',
-      name: 'Alex Johnson',
-      avatar: 'AJ',
-      level: 15,
-      xp: 12500,
-      streak: 89,
-      problemsSolved: 234,
-      coursesCompleted: 18,
-      rank: 1,
-      isCurrentUser: false,
-      badge: '👑',
-      lastActive: new Date('2024-01-21')
-    },
-    {
-      id: '2',
-      name: 'Sarah Chen',
-      avatar: 'SC',
-      level: 12,
-      xp: 10800,
-      streak: 67,
-      problemsSolved: 198,
-      coursesCompleted: 15,
-      rank: 2,
-      isCurrentUser: false,
-      badge: '🥈',
-      lastActive: new Date('2024-01-21')
-    },
-    {
-      id: '3',
-      name: 'Mike Rodriguez',
-      avatar: 'MR',
-      level: 11,
-      xp: 9500,
-      streak: 45,
-      problemsSolved: 176,
-      coursesCompleted: 12,
-      rank: 3,
-      isCurrentUser: false,
-      badge: '🥉',
-      lastActive: new Date('2024-01-20')
-    },
-    {
-      id: '4',
-      name: 'Emma Wilson',
-      avatar: 'EW',
-      level: 10,
-      xp: 8200,
-      streak: 52,
-      problemsSolved: 145,
-      coursesCompleted: 11,
-      rank: 4,
-      isCurrentUser: false,
-      lastActive: new Date('2024-01-21')
-    },
-    {
-      id: '5',
-      name: 'David Kim',
-      avatar: 'DK',
-      level: 9,
-      xp: 7800,
-      streak: 38,
-      problemsSolved: 132,
-      coursesCompleted: 10,
-      rank: 5,
-      isCurrentUser: false,
-      lastActive: new Date('2024-01-19')
-    },
-    {
-      id: '6',
-      name: 'Lisa Thompson',
-      avatar: 'LT',
-      level: 8,
-      xp: 4250,
-      streak: 42,
-      problemsSolved: 156,
-      coursesCompleted: 12,
-      rank: 6,
-      isCurrentUser: true,
-      lastActive: new Date('2024-01-21')
-    },
-    {
-      id: '7',
-      name: 'James Brown',
-      avatar: 'JB',
-      level: 8,
-      xp: 4100,
-      streak: 35,
-      problemsSolved: 128,
-      coursesCompleted: 9,
-      rank: 7,
-      isCurrentUser: false,
-      lastActive: new Date('2024-01-18')
-    },
-    {
-      id: '8',
-      name: 'Maria Garcia',
-      avatar: 'MG',
-      level: 7,
-      xp: 3800,
-      streak: 28,
-      problemsSolved: 98,
-      coursesCompleted: 8,
-      rank: 8,
-      isCurrentUser: false,
-      lastActive: new Date('2024-01-17')
-    }
-  ];
+  const { data: leaderboard = [], isLoading } = useQuery<LeaderboardEntry[]>({
+    queryKey: ['/api/leaderboard'],
+  });
+
+  // Real-time leaderboard updates via Socket.io
+  useEffect(() => {
+    const socket = io({ transports: ['websocket', 'polling'] });
+    socket.on('leaderboard-updated', () => {
+      qc.invalidateQueries({ queryKey: ['/api/leaderboard'] });
+    });
+    return () => { socket.disconnect(); };
+  }, [qc]);
 
   const categories = [
     { id: 'xp', label: 'Total XP', icon: Star },
-    { id: 'streak', label: 'Current Streak', icon: Flame },
-    { id: 'problems', label: 'Problems Solved', icon: Target },
-    { id: 'courses', label: 'Courses Completed', icon: BookOpen }
+    { id: 'streak', label: 'Streak', icon: Flame },
+    { id: 'level', label: 'Level', icon: Target },
   ];
 
-  const timeframes = [
-    { id: 'all-time', label: 'All Time' },
-    { id: 'this-month', label: 'This Month' },
-    { id: 'this-week', label: 'This Week' }
-  ];
+  const getValue = (entry: LeaderboardEntry) => {
+    if (selectedCategory === 'xp') return entry.xp;
+    if (selectedCategory === 'streak') return entry.streak;
+    return entry.level;
+  };
+
+  const sorted = [...(leaderboard as LeaderboardEntry[])]
+    .sort((a, b) => getValue(b) - getValue(a))
+    .map((e, i) => ({ ...e, rank: i + 1 }))
+    .filter(e => `${e.firstName} ${e.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()));
 
   const getRankIcon = (rank: number) => {
-    switch (rank) {
-      case 1: return '🥇';
-      case 2: return '🥈';
-      case 3: return '🥉';
-      default: return `#${rank}`;
-    }
+    if (rank === 1) return '🥇';
+    if (rank === 2) return '🥈';
+    if (rank === 3) return '🥉';
+    return `#${rank}`;
   };
 
   const getRankColor = (rank: number) => {
-    switch (rank) {
-      case 1: return 'bg-yellow-500/20 text-yellow-600 border-yellow-500/30';
-      case 2: return 'bg-gray-400/20 text-gray-600 border-gray-400/30';
-      case 3: return 'bg-orange-500/20 text-orange-600 border-orange-500/30';
-      default: return 'bg-muted/50 border-muted';
-    }
+    if (rank === 1) return 'bg-yellow-500/20 text-yellow-600 border-yellow-500/30';
+    if (rank === 2) return 'bg-gray-400/20 text-gray-600 border-gray-400/30';
+    if (rank === 3) return 'bg-orange-500/20 text-orange-600 border-orange-500/30';
+    return 'bg-muted/50 border-muted';
   };
 
-  const sortUsers = (users: LeaderboardUser[], category: string) => {
-    return [...users].sort((a, b) => {
-      switch (category) {
-        case 'xp': return b.xp - a.xp;
-        case 'streak': return b.streak - a.streak;
-        case 'problems': return b.problemsSolved - a.problemsSolved;
-        case 'courses': return b.coursesCompleted - a.coursesCompleted;
-        default: return b.xp - a.xp;
-      }
-    }).map((user, index) => ({ ...user, rank: index + 1 }));
-  };
-
-  const getCategoryValue = (user: LeaderboardUser, category: string) => {
-    switch (category) {
-      case 'xp': return user.xp;
-      case 'streak': return user.streak;
-      case 'problems': return user.problemsSolved;
-      case 'courses': return user.coursesCompleted;
-      default: return user.xp;
-    }
-  };
-
-  const filteredAndSortedUsers = sortUsers(
-    leaderboardData.filter(user => 
-      user.name.toLowerCase().includes(searchTerm.toLowerCase())
-    ),
-    selectedCategory
-  );
-
-  const currentUser = filteredAndSortedUsers.find(user => user.isCurrentUser);
-  const topUsers = filteredAndSortedUsers.slice(0, 3);
+  const top3 = sorted.slice(0, 3);
+  const currentUserEntry = user ? sorted.find(e => e.id === user.id) : null;
 
   return (
     <div className="space-y-4">
       {/* Top 3 Podium */}
-      {topUsers.length > 0 && (
+      {!isLoading && top3.length > 0 && (
         <Card className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border-yellow-500/20">
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
+            <CardTitle className="flex items-center gap-2">
               <Trophy className="h-5 w-5 text-yellow-600" />
-              <span>Top Performers</span>
+              Top Performers
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-end justify-center space-x-4">
-              {/* 2nd Place */}
-              {topUsers[1] && (
+            <div className="flex items-end justify-center gap-6">
+              {top3[1] && (
                 <div className="text-center">
-                  <div className="w-16 h-16 bg-gray-400/20 rounded-full flex items-center justify-center mx-auto mb-2 border-2 border-gray-400/30">
-                    <span className="text-2xl">🥈</span>
-                  </div>
-                  <div className="text-sm font-semibold">{topUsers[1].name}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {getCategoryValue(topUsers[1], selectedCategory).toLocaleString()}
-                  </div>
+                  <div className="w-14 h-14 bg-gray-400/20 rounded-full flex items-center justify-center mx-auto mb-2 border-2 border-gray-400/30 text-2xl">🥈</div>
+                  <div className="text-sm font-semibold">{top3[1].firstName}</div>
+                  <div className="text-xs text-muted-foreground">{getValue(top3[1]).toLocaleString()}</div>
                 </div>
               )}
-              
-              {/* 1st Place */}
-              {topUsers[0] && (
+              {top3[0] && (
                 <div className="text-center">
-                  <div className="w-20 h-20 bg-yellow-500/20 rounded-full flex items-center justify-center mx-auto mb-2 border-2 border-yellow-500/30">
-                    <span className="text-3xl">🥇</span>
-                  </div>
-                  <div className="text-lg font-bold">{topUsers[0].name}</div>
-                  <div className="text-sm text-muted-foreground">
-                    {getCategoryValue(topUsers[0], selectedCategory).toLocaleString()}
-                  </div>
+                  <div className="w-18 h-18 bg-yellow-500/20 rounded-full flex items-center justify-center mx-auto mb-2 border-2 border-yellow-500/30 text-3xl p-3">🥇</div>
+                  <div className="text-base font-bold">{top3[0].firstName}</div>
+                  <div className="text-sm text-muted-foreground">{getValue(top3[0]).toLocaleString()}</div>
                 </div>
               )}
-              
-              {/* 3rd Place */}
-              {topUsers[2] && (
+              {top3[2] && (
                 <div className="text-center">
-                  <div className="w-16 h-16 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-2 border-2 border-orange-500/30">
-                    <span className="text-2xl">🥉</span>
-                  </div>
-                  <div className="text-sm font-semibold">{topUsers[2].name}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {getCategoryValue(topUsers[2], selectedCategory).toLocaleString()}
-                  </div>
+                  <div className="w-14 h-14 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-2 border-2 border-orange-500/30 text-2xl">🥉</div>
+                  <div className="text-sm font-semibold">{top3[2].firstName}</div>
+                  <div className="text-xs text-muted-foreground">{getValue(top3[2]).toLocaleString()}</div>
                 </div>
               )}
             </div>
@@ -268,139 +110,82 @@ export function Leaderboard() {
         </Card>
       )}
 
-      {/* Filters */}
-      <div className="flex flex-col lg:flex-row gap-4">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search users..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
+      {/* Category + Search */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Search users..." value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)} className="pl-10" />
         </div>
         <div className="flex gap-2">
-          <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="px-3 py-2 border rounded text-sm"
-          >
-            {categories.map(cat => (
-              <option key={cat.id} value={cat.id}>
-                {cat.label}
-              </option>
-            ))}
-          </select>
-          <select
-            value={timeframe}
-            onChange={(e) => setTimeframe(e.target.value)}
-            className="px-3 py-2 border rounded text-sm"
-          >
-            {timeframes.map(tf => (
-              <option key={tf.id} value={tf.id}>
-                {tf.label}
-              </option>
-            ))}
-          </select>
+          {categories.map(cat => (
+            <button key={cat.id}
+              onClick={() => setSelectedCategory(cat.id)}
+              className={`px-3 py-1.5 rounded text-sm border transition-colors ${selectedCategory === cat.id ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:bg-muted'}`}>
+              {cat.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Leaderboard List */}
+      {/* List */}
       <Card>
         <CardContent className="p-0">
-          <div className="space-y-1">
-            {filteredAndSortedUsers.map((user) => {
-              const categoryValue = getCategoryValue(user, selectedCategory);
-              const selectedCategoryData = categories.find(cat => cat.id === selectedCategory);
-              const IconComponent = selectedCategoryData?.icon || Star;
-              
-              return (
-                <div
-                  key={user.id}
-                  className={`p-4 border-b last:border-b-0 transition-all hover:bg-muted/50 ${
-                    user.isCurrentUser ? 'bg-primary/5 border-primary/20' : ''
-                  }`}
-                >
-                  <div className="flex items-center space-x-4">
-                    {/* Rank */}
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 ${
-                      getRankColor(user.rank)
-                    }`}>
-                      {getRankIcon(user.rank)}
+          {isLoading ? (
+            <div className="p-4 space-y-3">
+              {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}
+            </div>
+          ) : sorted.length === 0 ? (
+            <div className="p-8 text-center text-muted-foreground text-sm">No users found</div>
+          ) : (
+            <div className="divide-y">
+              {sorted.map(entry => {
+                const isMe = user?.id === entry.id;
+                return (
+                  <div key={entry.id} className={`flex items-center gap-4 p-4 hover:bg-muted/50 transition-colors ${isMe ? 'bg-primary/5' : ''}`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 shrink-0 ${getRankColor(entry.rank)}`}>
+                      {getRankIcon(entry.rank)}
                     </div>
-                    
-                    {/* Avatar */}
-                    <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center text-primary font-semibold">
-                      {user.avatar}
+                    <div className="w-9 h-9 bg-primary/20 rounded-full flex items-center justify-center text-primary font-semibold text-sm shrink-0">
+                      {entry.firstName[0]}{entry.lastName[0]}
                     </div>
-                    
-                    {/* User Info */}
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2">
-                        <h4 className="font-semibold">{user.name}</h4>
-                        {user.badge && <span className="text-lg">{user.badge}</span>}
-                        {user.isCurrentUser && (
-                          <Badge className="bg-primary/20 text-primary">You</Badge>
-                        )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-sm truncate">{entry.firstName} {entry.lastName}</span>
+                        {isMe && <Badge className="bg-primary/20 text-primary text-xs">You</Badge>}
                       </div>
-                      <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                        <span>Level {user.level}</span>
-                        <span>•</span>
-                        <span>{user.lastActive.toLocaleDateString()}</span>
-                      </div>
+                      <span className="text-xs text-muted-foreground">Level {entry.level}</span>
                     </div>
-                    
-                    {/* Category Value */}
-                    <div className="text-right">
-                      <div className="flex items-center space-x-2">
-                        <IconComponent className="h-4 w-4 text-primary" />
-                        <span className="font-semibold">
-                          {categoryValue.toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {selectedCategoryData?.label}
-                      </div>
+                    <div className="text-right shrink-0">
+                      <div className="font-semibold text-sm">{getValue(entry).toLocaleString()}</div>
+                      <div className="text-xs text-muted-foreground">{categories.find(c => c.id === selectedCategory)?.label}</div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Current User Stats */}
-      {currentUser && (
+      {/* Your stats */}
+      {currentUserEntry && (
         <Card className="bg-primary/5 border-primary/20">
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Award className="h-5 w-5 text-primary" />
-              <span>Your Performance</span>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Award className="h-4 w-4 text-primary" /> Your Standing
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-primary">#{currentUser.rank}</div>
-                <div className="text-sm text-muted-foreground">Your Rank</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-500">{currentUser.xp}</div>
-                <div className="text-sm text-muted-foreground">Total XP</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-orange-500">{currentUser.streak}</div>
-                <div className="text-sm text-muted-foreground">Day Streak</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-blue-500">{currentUser.problemsSolved}</div>
-                <div className="text-sm text-muted-foreground">Problems Solved</div>
-              </div>
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div><div className="text-2xl font-bold text-primary">#{currentUserEntry.rank}</div><div className="text-xs text-muted-foreground">Rank</div></div>
+              <div><div className="text-2xl font-bold text-green-500">{currentUserEntry.xp}</div><div className="text-xs text-muted-foreground">XP</div></div>
+              <div><div className="text-2xl font-bold text-orange-500">{currentUserEntry.streak}</div><div className="text-xs text-muted-foreground">Streak</div></div>
             </div>
           </CardContent>
         </Card>
       )}
     </div>
   );
-} 
+}
+

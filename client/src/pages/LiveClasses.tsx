@@ -1,21 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/contexts/UserRoleContext';
-import { LiveClass, VideoCallState } from '../types';
-import { Button } from '../components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
-import { Textarea } from '../components/ui/textarea';
-import { Badge } from '../components/ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Calendar, Clock, Users, Video, Mic, MicOff, VideoOff, Share, MessageSquare, Settings, Plus, Play, StopCircle, AlertCircle, CheckCircle } from 'lucide-react';
+import { LiveClass, VideoCallState } from '@/types';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Calendar, Clock, Users, Video, Plus, Play, StopCircle, AlertCircle, CheckCircle } from 'lucide-react';
 import { VideoCall } from './VideoCall';
+import { useToast } from '@/hooks/use-toast';
 
 export function LiveClasses() {
   const { user, isAuthenticated } = useAuth();
   const { isAdmin, isStudent } = useUserRole();
+  const { toast } = useToast();
   const [liveClasses, setLiveClasses] = useState<LiveClass[]>([]);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedClass, setSelectedClass] = useState<LiveClass | null>(null);
@@ -24,6 +26,10 @@ export function LiveClasses() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [isCreating, setIsCreating] = useState(false);
+  const [isJoinByCodeOpen, setIsJoinByCodeOpen] = useState(false);
+  const [joinCode, setJoinCode] = useState('');
+  const [joinCodeError, setJoinCodeError] = useState('');
+  const [isJoiningByCode, setIsJoiningByCode] = useState(false);
 
   const [newClass, setNewClass] = useState({
     title: '',
@@ -40,62 +46,31 @@ export function LiveClasses() {
 
   const fetchLiveClasses = async () => {
     try {
-      const response = await fetch('/api/live-classes');
+      const response = await fetch('/api/live-classes', { credentials: 'include' });
       const data = await response.json();
       setLiveClasses(data);
-    } catch (error) {
-      console.error('Failed to fetch live classes:', error);
+    } catch {
+      toast({ title: 'Error', description: 'Failed to load live classes', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
   };
 
   const createLiveClass = async () => {
-    // Form validation
-    if (!newClass.title.trim()) {
-      alert('Please enter a class title');
-      return;
-    }
-    if (!newClass.description.trim()) {
-      alert('Please enter a class description');
-      return;
-    }
-    if (!newClass.startTime) {
-      alert('Please select a start time');
-      return;
-    }
-    if (!newClass.endTime) {
-      alert('Please select an end time');
-      return;
-    }
-    if (new Date(newClass.startTime) >= new Date(newClass.endTime)) {
-      alert('End time must be after start time');
-      return;
-    }
-    if (new Date(newClass.startTime) <= new Date()) {
-      alert('Start time must be in the future');
-      return;
-    }
-    if (!user?.id) {
-      alert('User not authenticated');
-      return;
-    }
+    if (!newClass.title.trim()) { toast({ title: 'Title required', variant: 'destructive' }); return; }
+    if (!newClass.description.trim()) { toast({ title: 'Description required', variant: 'destructive' }); return; }
+    if (!newClass.startTime) { toast({ title: 'Start time required', variant: 'destructive' }); return; }
+    if (!newClass.endTime) { toast({ title: 'End time required', variant: 'destructive' }); return; }
+    if (new Date(newClass.startTime) >= new Date(newClass.endTime)) { toast({ title: 'End time must be after start time', variant: 'destructive' }); return; }
+    if (new Date(newClass.startTime) <= new Date()) { toast({ title: 'Start time must be in the future', variant: 'destructive' }); return; }
+    if (!user?.id) { toast({ title: 'Not authenticated', variant: 'destructive' }); return; }
 
     setIsCreating(true);
-
     try {
-      console.log('Creating live class with data:', {
-        ...newClass,
-        instructorId: user.id,
-        instructorName: `${user.firstName} ${user.lastName}`,
-        tags: newClass.tags.split(',').map(tag => tag.trim()).filter(tag => tag),
-      });
-
       const response = await fetch('/api/live-classes', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           ...newClass,
           instructorId: user.id,
@@ -104,30 +79,18 @@ export function LiveClasses() {
         }),
       });
 
-      console.log('Response status:', response.status);
-
       if (response.ok) {
         const createdClass = await response.json();
-        console.log('Created class:', createdClass);
         setLiveClasses(prev => [...prev, createdClass]);
         setIsCreateDialogOpen(false);
-        setNewClass({
-          title: '',
-          description: '',
-          startTime: '',
-          endTime: '',
-          maxParticipants: 50,
-          tags: ''
-        });
-        alert('Live class created successfully!');
+        setNewClass({ title: '', description: '', startTime: '', endTime: '', maxParticipants: 50, tags: '' });
+        toast({ title: 'Live class created successfully' });
       } else {
-        const errorData = await response.text();
-        console.error('Server error:', errorData);
-        alert(`Failed to create live class: ${errorData}`);
+        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+        toast({ title: 'Failed to create class', description: errorData.message, variant: 'destructive' });
       }
-    } catch (error) {
-      console.error('Failed to create live class:', error);
-      alert('Failed to create live class. Please try again.');
+    } catch {
+      toast({ title: 'Failed to create live class', variant: 'destructive' });
     } finally {
       setIsCreating(false);
     }
@@ -137,22 +100,18 @@ export function LiveClasses() {
     try {
       const response = await fetch(`/api/live-classes/${liveClass.id}/join`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId: user?.id,
-          userName: `${user?.firstName} ${user?.lastName}`,
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ userId: user?.id, userName: `${user?.firstName} ${user?.lastName}` }),
       });
-
       if (response.ok) {
-        const result = await response.json();
         setSelectedClass(liveClass);
         setIsVideoCallOpen(true);
+      } else {
+        toast({ title: 'Failed to join class', variant: 'destructive' });
       }
-    } catch (error) {
-      console.error('Failed to join live class:', error);
+    } catch {
+      toast({ title: 'Failed to join live class', variant: 'destructive' });
     }
   };
 
@@ -160,19 +119,13 @@ export function LiveClasses() {
     try {
       await fetch(`/api/live-classes/${liveClass.id}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ status: 'live' }),
       });
-      
-      setLiveClasses(prev => 
-        prev.map(cls => 
-          cls.id === liveClass.id ? { ...cls, status: 'live' as const } : cls
-        )
-      );
-    } catch (error) {
-      console.error('Failed to start live class:', error);
+      setLiveClasses(prev => prev.map(cls => cls.id === liveClass.id ? { ...cls, status: 'live' as const } : cls));
+    } catch {
+      toast({ title: 'Failed to start class', variant: 'destructive' });
     }
   };
 
@@ -180,19 +133,13 @@ export function LiveClasses() {
     try {
       await fetch(`/api/live-classes/${liveClass.id}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ status: 'ended' }),
       });
-      
-      setLiveClasses(prev => 
-        prev.map(cls => 
-          cls.id === liveClass.id ? { ...cls, status: 'ended' as const } : cls
-        )
-      );
-    } catch (error) {
-      console.error('Failed to end live class:', error);
+      setLiveClasses(prev => prev.map(cls => cls.id === liveClass.id ? { ...cls, status: 'ended' as const } : cls));
+    } catch {
+      toast({ title: 'Failed to end class', variant: 'destructive' });
     }
   };
 
@@ -200,11 +147,12 @@ export function LiveClasses() {
     try {
       await fetch(`/api/live-classes/${liveClass.id}`, {
         method: 'DELETE',
+        credentials: 'include',
       });
-      
       setLiveClasses(prev => prev.filter(cls => cls.id !== liveClass.id));
-    } catch (error) {
-      console.error('Failed to delete live class:', error);
+      toast({ title: 'Class deleted' });
+    } catch {
+      toast({ title: 'Failed to delete class', variant: 'destructive' });
     }
   };
 
@@ -354,6 +302,81 @@ export function LiveClasses() {
             </DialogContent>
           </Dialog>
         )}
+        {/* Only show join by code for students */}
+        {isAuthenticated && isStudent && (
+          <Dialog open={isJoinByCodeOpen} onOpenChange={setIsJoinByCodeOpen}>
+            <DialogTrigger asChild>
+              <Button variant="secondary" className="flex items-center gap-2">
+                <Video className="h-4 w-4" />
+                Join Class by Code
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[400px]">
+              <DialogHeader>
+                <DialogTitle>Join Class by Code</DialogTitle>
+                <DialogDescription>
+                  Enter the meeting code provided by your instructor to join a live class.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="joinCode">Meeting Code</Label>
+                  <Input
+                    id="joinCode"
+                    value={joinCode}
+                    onChange={e => { setJoinCode(e.target.value); setJoinCodeError(''); }}
+                    placeholder="Enter meeting code (room ID)"
+                    disabled={isJoiningByCode}
+                  />
+                  {joinCodeError && <span className="text-red-500 text-xs">{joinCodeError}</span>}
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setIsJoinByCodeOpen(false)} disabled={isJoiningByCode}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={async () => {
+                    if (!joinCode.trim()) {
+                      setJoinCodeError('Please enter a meeting code.');
+                      return;
+                    }
+                    setIsJoiningByCode(true);
+                    setJoinCodeError('');
+                    try {
+                      const response = await fetch(`/api/live-classes?roomId=${encodeURIComponent(joinCode.trim())}`, { credentials: 'include' });
+                      if (!response.ok) { setJoinCodeError('Class not found. Please check the code.'); setIsJoiningByCode(false); return; }
+                      const data = await response.json();
+                      if (!data || !data.id) { setJoinCodeError('Class not found. Please check the code.'); setIsJoiningByCode(false); return; }
+                      const joinRes = await fetch(`/api/live-classes/${data.id}/join`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({ userId: user?.id, userName: `${user?.firstName} ${user?.lastName}` }),
+                      });
+                      if (!joinRes.ok) {
+                        setJoinCodeError('Failed to join class.');
+                        setIsJoiningByCode(false);
+                        return;
+                      }
+                      setSelectedClass(data);
+                      setIsVideoCallOpen(true);
+                      setIsJoinByCodeOpen(false);
+                      setJoinCode('');
+                    } catch (err) {
+                      setJoinCodeError('Error joining class.');
+                    } finally {
+                      setIsJoiningByCode(false);
+                    }
+                  }}
+                  disabled={isJoiningByCode}
+                >
+                  {isJoiningByCode ? 'Joining...' : 'Join Class'}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       {/* Search and Filters */}
@@ -384,12 +407,17 @@ export function LiveClasses() {
       {/* Live Classes Grid */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {filteredClasses.map((liveClass) => (
-          <Card key={liveClass.id} className="relative border border-border bg-card shadow-sm hover:shadow-md transition-all duration-200 rounded-lg">
-            <CardHeader className="pb-4 px-6 pt-6">
+          <Card
+            key={liveClass.id}
+            className="relative border border-border bg-card shadow-sm hover:shadow-md transition-all duration-200 rounded-lg overflow-hidden min-h-[240px] h-full flex flex-col"
+          >
+            <CardHeader className="pb-4 px-6 pt-6 flex-1">
               <div className="flex justify-between items-start">
-                <div className="flex-1 pr-4">
-                  <CardTitle className="text-xl font-semibold mb-2 leading-tight">{liveClass.title}</CardTitle>
-                  <CardDescription className="text-sm text-muted-foreground leading-relaxed">
+                <div className="flex-1 pr-4 min-w-0">
+                  <CardTitle className="text-xl font-semibold mb-2 leading-tight truncate" title={liveClass.title}>
+                    {liveClass.title}
+                  </CardTitle>
+                  <CardDescription className="text-sm text-muted-foreground leading-relaxed line-clamp-3 break-words">
                     {liveClass.description}
                   </CardDescription>
                 </div>

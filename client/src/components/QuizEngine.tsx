@@ -383,7 +383,6 @@ export function QuizEngine() {
   });
 
   const createQuiz = () => {
-    console.log('Creating new quiz');
     setShowCreateModal(false);
   };
 

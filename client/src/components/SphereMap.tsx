@@ -97,13 +97,11 @@ export function SphereMap() {
   }, []);
 
   const handleContinueLearning = () => {
-    console.log('Continue Learning button clicked!');
     alert('Opening a pathway to new courses! (Future feature)');
   };
 
   const handleEventInfoClick = (point: any, event: MouseEvent, coords: { lat: number; lng: number; altitude: number }) => {
     const eventData = point as GlobalEvent;
-    console.log('Event Details:', eventData);
     alert(`Event Details:\nTitle: ${eventData.title}\nLocation: ${eventData.location}\nDate: ${eventData.date}\n\nDescription: ${eventData.description}`);
   };
 

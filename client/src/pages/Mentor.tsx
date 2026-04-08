@@ -94,28 +94,54 @@ export function Mentor() {
     setIsTyping(true);
 
     try {
-      const aiResponse = await generateAIResponse(currentInput);
-      const responseMessage: ChatMessage = {
+      // Build history for context (last 10 messages)
+      const history = messages.slice(-10).map(m => ({
+        role: m.type === 'user' ? 'user' : 'assistant',
+        content: m.content,
+      }));
+
+      const res = await fetch('/api/mentor/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ message: currentInput, history }),
+      });
+
+      let reply: string;
+      if (res.ok) {
+        const data = await res.json();
+        reply = data.reply;
+      } else if (res.status === 429) {
+        reply = "⏳ You've used your 20 free AI messages this hour. Upgrade to Pro for unlimited access, or try again later.";
+      } else if (res.status === 402) {
+        reply = "🔒 The AI Mentor is available on Pro and Premium plans. Upgrade your subscription to unlock unlimited AI-powered coding help!";
+      } else if (res.status === 503) {
+        // OpenAI not configured — use local fallback
+        reply = await generateLocalResponse(currentInput);
+      } else {
+        reply = "I'm having trouble right now. Please try again in a moment.";
+      }
+
+      setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         type: 'ai',
-        content: aiResponse,
+        content: reply,
         timestamp: new Date()
-      };
-      setMessages(prev => [...prev, responseMessage]);
-    } catch (error) {
-      const errorMessage: ChatMessage = {
+      }]);
+    } catch {
+      const reply = await generateLocalResponse(currentInput);
+      setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         type: 'ai',
-        content: "I'm having trouble connecting to my AI services right now. Please check if you have provided the necessary API keys in your environment settings. In the meantime, I can still help with basic programming questions using my built-in knowledge!",
+        content: reply,
         timestamp: new Date()
-      };
-      setMessages(prev => [...prev, errorMessage]);
+      }]);
     } finally {
       setIsTyping(false);
     }
   };
 
-  const generateAIResponse = async (userInput: string): Promise<string> => {
+  const generateLocalResponse = async (userInput: string): Promise<string> => {
     // Enhanced AI responses for various types of questions
     const input = userInput.toLowerCase();
     

@@ -9,11 +9,18 @@ export interface User {
   nextLevelXP: number;
   streak: number;
   joinDate: string;
-  completedCourses: number;
+  completedCourses: string[];
   problemsSolved: number;
   learningPath?: string;
   avatar?: string;
   name?: string;
+  codeCoins?: number;
+  codeCoinsHistory?: {
+    type: 'earn' | 'spend';
+    amount: number;
+    reason: string;
+    date: string;
+  }[];
 }
 
 export interface RegisterData {
@@ -34,6 +41,7 @@ export interface AuthContextType extends AuthState {
   register: (userData: Omit<User, 'id' | 'joinDate'>) => Promise<boolean>;
   logout: () => void;
   updateUser: (updates: Partial<User>) => void;
+  completeCourse: (courseId: string) => void;
 }
 
 export interface Course {
@@ -212,7 +220,6 @@ export interface ActivityItem {
 
 export type Section = 
   | 'dashboard' 
-  | 'admin-dashboard'
   | 'roadmaps' 
   | 'resources' 
   | 'videos' 
@@ -226,7 +233,13 @@ export type Section =
   | 'profile' 
   | 'settings'
   | 'live-classes'
-  | 'analytics';
+  | 'analytics'
+  | 'store'
+  | 'tutorials'
+  | 'admin-pdf-resources'
+  | 'admin-video-resources'
+  | 'admin-live-classes'
+  | 'admin-sphere-map';
 
 // Live Video Conferencing Types
 export interface LiveClass {
