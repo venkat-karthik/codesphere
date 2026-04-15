@@ -37,21 +37,66 @@ router.patch("/resources/:id", requireAdmin, async (req, res) => {
   }
 });
 
+// ─── VIDEOS (resources with type='video') ────────────────────────────────
+
+router.get("/videos", async (req, res) => {
+  try {
+    const all = await storage.getAllResources();
+    const videos = all.filter((r: any) => r.type === 'video');
+    return res.json(videos);
+  } catch (error) {
+    return res.status(500).json({ message: "Failed to get videos" });
+  }
+});
+
+router.post("/videos", requireAdmin, async (req, res) => {
+  try {
+    const resource = await storage.createResource({ ...req.body, type: 'video' });
+    return res.status(201).json(resource);
+  } catch (error) {
+    return res.status(500).json({ message: "Failed to create video" });
+  }
+});
+
+router.patch("/videos/:id", requireAdmin, async (req, res) => {
+  try {
+    const resource = await storage.updateResource(parseInt(req.params.id), req.body);
+    if (!resource) return res.status(404).json({ message: "Video not found" });
+    return res.json(resource);
+  } catch (error) {
+    return res.status(500).json({ message: "Failed to update video" });
+  }
+});
+
 // ─── PROBLEMS ────────────────────────────────────────────────────────────
 
 router.get("/problems", async (req, res) => {
   try {
-    const { difficulty, daily } = req.query;
-    let problems;
+    const { difficulty, daily, category, search } = req.query;
+    let allProblems = await storage.getAllProblems();
+
     if (daily === 'true') {
-      const dp = await storage.getDailyProblem(new Date());
-      problems = dp ? [dp] : [];
-    } else if (difficulty) {
-      problems = await storage.getProblemsByDifficulty(difficulty as string);
-    } else {
-      problems = await storage.getAllProblems();
+      allProblems = allProblems.filter((p: any) => p.isDaily);
     }
-    return res.json(problems);
+    if (difficulty && difficulty !== 'all') {
+      allProblems = allProblems.filter((p: any) =>
+        p.difficulty.toLowerCase() === (difficulty as string).toLowerCase()
+      );
+    }
+    if (category && category !== 'all') {
+      allProblems = allProblems.filter((p: any) =>
+        p.category.toLowerCase() === (category as string).toLowerCase()
+      );
+    }
+    if (search) {
+      const q = (search as string).toLowerCase();
+      allProblems = allProblems.filter((p: any) =>
+        p.title.toLowerCase().includes(q) ||
+        p.description.toLowerCase().includes(q) ||
+        (p.tags as string[]).some((t: string) => t.toLowerCase().includes(q))
+      );
+    }
+    return res.json(allProblems);
   } catch (error) {
     return res.status(500).json({ message: "Failed to get problems" });
   }

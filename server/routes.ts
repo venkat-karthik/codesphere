@@ -15,6 +15,7 @@ import mentorRouter from "./routes/mentor";
 import liveClassRouter from "./routes/liveClasses";
 import analyticsRouter from "./routes/analytics";
 import adminRouter from "./routes/admin";
+import projectsRouter from "./routes/projects";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Apply global sanitization to all API routes
@@ -33,6 +34,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/live-classes", liveClassRouter);
   app.use("/api/analytics", analyticsRouter);
   app.use("/api/admin", adminRouter);
+  app.use("/api/projects", projectsRouter);
 
   const httpServer = createServer(app);
   return httpServer;

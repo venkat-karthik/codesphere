@@ -236,7 +236,6 @@ export type Section =
   | 'analytics'
   | 'store'
   | 'tutorials'
-  | 'video-call'
   | 'admin-pdf-resources'
   | 'admin-video-resources'
   | 'admin-live-classes'

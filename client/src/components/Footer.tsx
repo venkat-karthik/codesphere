@@ -20,9 +20,10 @@ export function Footer() {
               Empowering the next generation of developers through immersive, high-fidelity learning experiences.
             </p>
             <div className="flex items-center gap-4">
-              <a href="#" className="text-muted-foreground hover:text-primary transition-colors"><Twitter className="h-5 w-5" /></a>
-              <a href="#" className="text-muted-foreground hover:text-primary transition-colors"><Github className="h-5 w-5" /></a>
-              <a href="#" className="text-muted-foreground hover:text-primary transition-colors"><Linkedin className="h-5 w-5" /></a>
+              <a href="https://twitter.com/codesphere" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors"><Twitter className="h-5 w-5" /></a>
+              <a href="https://github.com/venkat-karthik/codesphere" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors"><Github className="h-5 w-5" /></a>
+              <a href="https://linkedin.com/company/codesphere" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors"><Linkedin className="h-5 w-5" /></a>
+              <a href="mailto:support@codesphere.app" className="text-muted-foreground hover:text-primary transition-colors"><Mail className="h-5 w-5" /></a>
             </div>
           </div>
 
@@ -49,13 +50,12 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* Legal Section */}
           <div className="space-y-4">
             <h4 className="font-bold text-sm uppercase tracking-widest text-primary">Legal</h4>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li><Link href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link></li>
               <li><Link href="/terms" className="hover:text-primary transition-colors">Terms of Service</Link></li>
-              <li><Link href="/terms" className="hover:text-primary transition-colors">Accessibility</Link></li>
+              <li><a href="mailto:support@codesphere.app" className="hover:text-primary transition-colors">Accessibility</a></li>
             </ul>
           </div>
         </div>

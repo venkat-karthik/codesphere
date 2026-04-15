@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Globe, MapPin, Users, Star, TrendingUp, Award, Code, Zap, Target, Brain, Rocket } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import Globe3D from 'react-globe.gl';
 
 interface Roadmap {
   id: number;
@@ -46,6 +47,82 @@ const DIFF_COLORS: Record<string, string> = {
   Intermediate: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
   Advanced: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
 };
+
+// Simulated learner locations around the world
+const LEARNER_POINTS = [
+  { lat: 40.7128, lng: -74.0060, city: 'New York', learners: 1243 },
+  { lat: 51.5074, lng: -0.1278, city: 'London', learners: 987 },
+  { lat: 35.6762, lng: 139.6503, city: 'Tokyo', learners: 876 },
+  { lat: 28.6139, lng: 77.2090, city: 'New Delhi', learners: 1456 },
+  { lat: -23.5505, lng: -46.6333, city: 'São Paulo', learners: 654 },
+  { lat: 48.8566, lng: 2.3522, city: 'Paris', learners: 743 },
+  { lat: 37.7749, lng: -122.4194, city: 'San Francisco', learners: 892 },
+  { lat: 1.3521, lng: 103.8198, city: 'Singapore', learners: 567 },
+  { lat: -33.8688, lng: 151.2093, city: 'Sydney', learners: 432 },
+  { lat: 55.7558, lng: 37.6173, city: 'Moscow', learners: 398 },
+  { lat: 31.2304, lng: 121.4737, city: 'Shanghai', learners: 1102 },
+  { lat: -26.2041, lng: 28.0473, city: 'Johannesburg', learners: 287 },
+  { lat: 19.4326, lng: -99.1332, city: 'Mexico City', learners: 445 },
+  { lat: 41.0082, lng: 28.9784, city: 'Istanbul', learners: 334 },
+  { lat: 25.2048, lng: 55.2708, city: 'Dubai', learners: 521 },
+  { lat: 13.7563, lng: 100.5018, city: 'Bangkok', learners: 389 },
+  { lat: 52.5200, lng: 13.4050, city: 'Berlin', learners: 612 },
+  { lat: 43.6532, lng: -79.3832, city: 'Toronto', learners: 478 },
+  { lat: 6.5244, lng: 3.3792, city: 'Lagos', learners: 356 },
+  { lat: 12.9716, lng: 77.5946, city: 'Bangalore', learners: 1678 },
+];
+
+function GlobeView() {
+  const globeRef = useRef<any>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(600);
+
+  useEffect(() => {
+    const update = () => {
+      if (containerRef.current) setWidth(containerRef.current.offsetWidth);
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
+  useEffect(() => {
+    if (globeRef.current) {
+      globeRef.current.controls().autoRotate = true;
+      globeRef.current.controls().autoRotateSpeed = 0.5;
+      globeRef.current.pointOfView({ altitude: 2.5 }, 0);
+    }
+  }, []);
+
+  return (
+    <div ref={containerRef} className="relative w-full bg-[#0a0a1a] rounded-b-lg overflow-hidden" style={{ height: 480 }}>
+      <Globe3D
+        ref={globeRef}
+        width={width}
+        height={480}
+        globeImageUrl="//unpkg.com/three-globe/example/img/earth-night.jpg"
+        backgroundImageUrl="//unpkg.com/three-globe/example/img/night-sky.png"
+        pointsData={LEARNER_POINTS}
+        pointLat="lat"
+        pointLng="lng"
+        pointColor={() => '#4ade80'}
+        pointAltitude={0.02}
+        pointRadius={(d: any) => Math.sqrt(d.learners) / 30}
+        pointLabel={(d: any) => `<div style="background:#1a1a2e;padding:8px 12px;border-radius:8px;border:1px solid #4ade80;color:#fff;font-size:13px"><b>${d.city}</b><br/>${d.learners.toLocaleString()} learners</div>`}
+        atmosphereColor="#4ade80"
+        atmosphereAltitude={0.15}
+      />
+      <div className="absolute bottom-4 left-4 right-4 flex flex-wrap gap-2 justify-center pointer-events-none">
+        <div className="bg-black/60 backdrop-blur-sm text-white text-xs px-3 py-1.5 rounded-full border border-green-500/30">
+          🌍 {LEARNER_POINTS.reduce((s, p) => s + p.learners, 0).toLocaleString()} active learners worldwide
+        </div>
+        <div className="bg-black/60 backdrop-blur-sm text-white text-xs px-3 py-1.5 rounded-full border border-green-500/30">
+          📍 {LEARNER_POINTS.length} cities
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function SphereMap() {
   const { user } = useAuth();
@@ -179,18 +256,15 @@ export function SphereMap() {
         </TabsContent>
 
         <TabsContent value="global">
-          <Card className="mt-4">
-            <CardHeader><CardTitle className="flex items-center gap-2"><MapPin className="h-5 w-5" />Global Learning Activity</CardTitle></CardHeader>
-            <CardContent>
-              <div className="h-80 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg flex items-center justify-center">
-                <div className="text-center">
-                  <Globe className="h-16 w-16 text-blue-500 mx-auto mb-4 animate-pulse" />
-                  <h3 className="text-xl font-semibold mb-2">Interactive World Map</h3>
-                  <p className="text-muted-foreground max-w-md text-sm">
-                    Real-time global learning activity visualization — coming in Phase 4.
-                  </p>
-                </div>
-              </div>
+          <Card className="mt-4 overflow-hidden">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MapPin className="h-5 w-5" />Global Learning Activity
+                <Badge variant="secondary" className="ml-auto text-xs">Live</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <GlobeView />
             </CardContent>
           </Card>
         </TabsContent>

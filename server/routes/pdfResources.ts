@@ -4,6 +4,7 @@ import fs from 'fs';
 import multer from 'multer';
 import { fileURLToPath } from 'url';
 import { storage } from '../storage';
+import { requireAdmin } from '../middleware';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -110,7 +111,7 @@ router.get('/', async (_req, res) => {
 });
 
 // POST upload a new PDF
-router.post('/', upload.single('pdf'), async (req, res) => {
+router.post('/', requireAdmin, upload.single('pdf'), async (req, res) => {
   try {
     const { title, description, category, difficulty } = req.body;
     if (!req.file) return res.status(400).json({ error: 'No PDF file uploaded' });
@@ -158,7 +159,7 @@ router.post('/', upload.single('pdf'), async (req, res) => {
 });
 
 // PUT update PDF metadata
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireAdmin, async (req, res) => {
   try {
     const updated = await storage.updateResource(parseInt(req.params.id), req.body);
     if (!updated) return res.status(404).json({ error: 'Not found' });
@@ -169,7 +170,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE PDF
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAdmin, async (req, res) => {
   try {
     const resource = await storage.getResource(parseInt(req.params.id));
     if (!resource) return res.status(404).json({ error: 'Not found' });

@@ -1,17 +1,20 @@
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useState, useRef } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
-  User, Calendar, Flame, Trophy, Target, Code, BookOpen,
-  TrendingUp, Clock, CheckCircle, Edit, BarChart3, Award,
-  Zap, Star, Users
+  User, Flame, Trophy, Target, Code, BookOpen,
+  TrendingUp, Clock, CheckCircle, BarChart3, Award,
+  Zap, Star, Users, Camera, Loader2
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
+import { apiRequest } from '@/lib/queryClient';
 
 interface AnalyticsRecord {
   id: number;
@@ -40,8 +43,40 @@ interface UserProject {
 }
 
 export function EnhancedProfile() {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
+  const { toast } = useToast();
+  const qc = useQueryClient();
   const [activeTab, setActiveTab] = useState('overview');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const avatarMutation = useMutation({
+    mutationFn: async (file: File) => {
+      // Convert to base64
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          // Strip the data URL prefix to get pure base64
+          resolve(result.split(',')[1]);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const res = await apiRequest('POST', `/api/users/${user!.id}/avatar`, {
+        imageData: base64,
+        mimeType: file.type,
+      });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      updateUser({ profileImage: data.profileImage });
+      toast({ title: 'Avatar updated!' });
+    },
+    onError: (err: any) => {
+      toast({ title: 'Upload failed', description: err.message, variant: 'destructive' });
+    },
+  });
 
   const { data: solutions = [], isLoading: solutionsLoading } = useQuery<UserSolution[]>({
     queryKey: [`/api/users/${user?.id}/solutions`],
@@ -49,7 +84,7 @@ export function EnhancedProfile() {
   });
 
   const { data: analytics = [], isLoading: analyticsLoading } = useQuery<AnalyticsRecord[]>({
-    queryKey: [`/api/users/${user?.id}/analytics`],
+    queryKey: [`/api/analytics/users/${user?.id}`],
     enabled: !!user && user.id > 0,
   });
 
@@ -114,9 +149,33 @@ export function EnhancedProfile() {
         <CardContent className="p-6">
           <div className="flex flex-col md:flex-row gap-6">
             <div className="flex flex-col items-center md:items-start gap-3">
-              <div className="w-20 h-20 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-2xl font-bold">
-                {user.firstName[0]}{user.lastName[0]}
+              {/* Clickable avatar with upload overlay */}
+              <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                <Avatar className="w-20 h-20 ring-2 ring-primary/20 group-hover:ring-primary/60 transition-all">
+                  <AvatarImage src={user.profileImage || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`} />
+                  <AvatarFallback className="bg-primary text-primary-foreground text-2xl font-bold">
+                    {user.firstName[0]}{user.lastName[0]}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  {avatarMutation.isPending
+                    ? <Loader2 className="h-5 w-5 text-white animate-spin" />
+                    : <Camera className="h-5 w-5 text-white" />
+                  }
+                </div>
               </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="hidden"
+                onChange={e => {
+                  const file = e.target.files?.[0];
+                  if (file) avatarMutation.mutate(file);
+                  e.target.value = '';
+                }}
+              />
+              <p className="text-xs text-muted-foreground">Click avatar to change</p>
               <div className="text-center md:text-left">
                 <h1 className="text-2xl font-bold">{user.firstName} {user.lastName}</h1>
                 <p className="text-muted-foreground text-sm">{user.email}</p>

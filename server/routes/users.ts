@@ -157,4 +157,16 @@ router.post("/:userId/solutions", requireAuth, async (req, res) => {
   }
 });
 
+// Update theme (called by ThemeContext on every theme change)
+router.patch("/theme", requireAuth, async (req, res) => {
+  try {
+    const { theme } = req.body;
+    if (!theme) return res.status(400).json({ message: "Theme is required" });
+    await storage.updateUser(req.session.userId!, { theme } as any);
+    return res.json({ message: "Theme updated" });
+  } catch (error) {
+    return res.status(500).json({ message: "Failed to update theme" });
+  }
+});
+
 export default router;

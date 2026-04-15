@@ -3,6 +3,7 @@ import { useLocation } from 'wouter';
 import { Sidebar } from './Sidebar';
 import { AuthModals } from './AuthModals';
 import { ErrorBoundary } from './ErrorBoundary';
+import { NotificationsPanel } from './NotificationsPanel';
 import { Search, Bell, AlertCircle, X, Menu, Activity, BookOpen, Code, User, ShoppingCart } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNotifications } from '@/contexts/NotificationsContext';
@@ -13,6 +14,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Footer } from './Footer';
 import { Command } from 'cmdk';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 
 interface LayoutProps {
   children: ReactNode;
@@ -27,6 +29,7 @@ export function Layout({ children }: LayoutProps) {
   const [verifyBannerDismissed, setVerifyBannerDismissed] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
 
   // Toggle command palette on Cmd+K
   useEffect(() => {
@@ -179,7 +182,7 @@ export function Layout({ children }: LayoutProps) {
               </button>
               
               <div className="flex items-center gap-2">
-                <Button variant="ghost" size="icon" className="relative hover:bg-primary/10">
+                <Button variant="ghost" size="icon" className="relative hover:bg-primary/10" onClick={() => setNotifOpen(true)}>
                   <Bell className="h-5 w-5" />
                   {unreadCount > 0 && (
                     <span className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full border-2 border-background" />
@@ -293,6 +296,16 @@ export function Layout({ children }: LayoutProps) {
         onClose={() => setAuthModalOpen(false)}
         onSwitchMode={setAuthMode}
       />
+
+      {/* Notifications Drawer */}
+      <Sheet open={notifOpen} onOpenChange={setNotifOpen}>
+        <SheetContent side="right" className="w-full sm:w-[420px] overflow-y-auto">
+          <SheetHeader className="mb-4">
+            <SheetTitle>Notifications</SheetTitle>
+          </SheetHeader>
+          <NotificationsPanel />
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

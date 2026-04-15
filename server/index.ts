@@ -176,5 +176,6 @@ app.use((req, res, next) => {
   const host = isProd ? '0.0.0.0' : '127.0.0.1';
   server.listen(port, host, () => {
     log(`serving on port ${port}`);
+    log(`http://localhost:${port}`);
   });
 })();

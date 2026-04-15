@@ -29,21 +29,21 @@ export default function AdminVideoResources() {
   const [form, setForm] = useState({ title: '', description: '', url: '', category: 'javascript', difficulty: 'beginner', fileSize: '' });
 
   const { data: videos = [], isLoading } = useQuery<VideoResource[]>({
-    queryKey: ['/api/videos'],
+    queryKey: ['/api/content/videos'],
   });
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const payload = { ...form, type: 'video', tags: [], downloadCount: 0 };
+      const payload = { ...form, type: 'video', tags: [form.category], downloadCount: 0 };
       if (editId) {
-        const res = await apiRequest('PATCH', `/api/resources/${editId}`, payload);
+        const res = await apiRequest('PATCH', `/api/content/videos/${editId}`, payload);
         return res.json();
       }
-      const res = await apiRequest('POST', '/api/resources', payload);
+      const res = await apiRequest('POST', '/api/content/videos', payload);
       return res.json();
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['/api/videos'] });
+      qc.invalidateQueries({ queryKey: ['/api/content/videos'] });
       setIsModalOpen(false);
       setForm({ title: '', description: '', url: '', category: 'javascript', difficulty: 'beginner', fileSize: '' });
       setEditId(null);

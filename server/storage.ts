@@ -3,28 +3,6 @@ import {
   type User, type InsertUser, type Roadmap, type UserProgress, type Resource, 
   type Problem, type UserSolution, type CommunityPost, type InsertCommunityPost
 } from "@shared/schema";
-import fs from 'fs';
-import path from 'path';
-
-const USERS_FILE = path.join(process.cwd(), '.data', 'users.json');
-
-function loadPersistedUsers(): Map<number, User> {
-  try {
-    if (fs.existsSync(USERS_FILE)) {
-      const raw = fs.readFileSync(USERS_FILE, 'utf-8');
-      const arr: User[] = JSON.parse(raw);
-      return new Map(arr.map(u => [u.id, u]));
-    }
-  } catch {}
-  return new Map();
-}
-
-function persistUsers(users: Map<number, User>) {
-  try {
-    fs.mkdirSync(path.dirname(USERS_FILE), { recursive: true });
-    fs.writeFileSync(USERS_FILE, JSON.stringify(Array.from(users.values()), null, 2));
-  } catch {}
-}
 
 export interface LiveClass {
   id: number;
@@ -154,45 +132,9 @@ export class MemStorage implements IStorage {
     this.liveClasses = new Map();
     this.currentId = 1;
     this.initializeData();
-
-    // Load any previously registered users (overrides demo users if same id)
-    const persisted = loadPersistedUsers();
-    persisted.forEach((u, id) => {
-      this.users.set(id, u);
-      if (id >= this.currentId) this.currentId = id + 1;
-    });
   }
 
   private initializeData() {
-    // Demo users — passwords: admin123 / student123
-    const adminUser: User = {
-      id: this.currentId++,
-      firstName: 'Admin', lastName: 'User',
-      email: 'admin@codesphere.com',
-      password: '$2b$10$JxnVCxnQISWn48tr0w5oEeRVh.GplnqxU.rLE7fFFk2G0gqGZtaz2',
-      role: 'admin', level: 10, xp: 5000, streak: 30,
-      theme: 'dark', subscriptionType: 'pro', totalStudyTime: 0,
-      profileImage: null, bio: null, subscriptionExpiry: null,
-      studyPattern: null, codeCoins: 0, joinDate: new Date(),
-      preferences: null, emailVerified: true,
-      emailVerifyToken: null, otp: null, otpExpiry: null,
-      passwordResetToken: null, passwordResetExpiry: null,
-    };
-    const studentUser: User = {
-      id: this.currentId++,
-      firstName: 'Student', lastName: 'User',
-      email: 'student@codesphere.com',
-      password: '$2b$10$p1BD8MFq.vAz0xJ31.2etOjrfy/jIIe33vDoKrk9E2i5U7i/6ndV2',
-      role: 'student', level: 5, xp: 1250, streak: 7,
-      theme: 'dark', subscriptionType: 'free', totalStudyTime: 0,
-      profileImage: null, bio: null, subscriptionExpiry: null,
-      studyPattern: null, codeCoins: 0, joinDate: new Date(),
-      preferences: null, emailVerified: true,
-      emailVerifyToken: null, otp: null, otpExpiry: null,
-      passwordResetToken: null, passwordResetExpiry: null,
-    };
-    this.users.set(adminUser.id, adminUser);
-    this.users.set(studentUser.id, studentUser);
     // Roadmaps...
     const frontendRoadmap: Roadmap = {
       id: this.currentId++,
@@ -260,7 +202,6 @@ export class MemStorage implements IStorage {
       passwordResetExpiry: null,
     };
     this.users.set(id, user);
-    persistUsers(this.users);
     return user;
   }
 
@@ -269,7 +210,6 @@ export class MemStorage implements IStorage {
     if (!user) return undefined;
     const updated = { ...user, ...updates };
     this.users.set(id, updated);
-    persistUsers(this.users);
     return updated;
   }
 

@@ -34,14 +34,12 @@ router.post("/register", async (req, res) => {
       level: 1,
       xp: 0,
       streak: 0,
-      theme: 'dark',
+      theme: 'nature',
       subscriptionType: 'free',
       totalStudyTime: 0,
     });
 
     const user = await storage.createUser(userData);
-
-    req.session.userId = user.id;
     req.session.userRole = user.role;
     await new Promise<void>((resolve, reject) => req.session.save(err => err ? reject(err) : resolve()));
 

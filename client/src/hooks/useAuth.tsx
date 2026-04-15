@@ -37,6 +37,22 @@ interface RegisterData {
   password: string;
 }
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+// Sync user's saved theme to localStorage so ThemeContext picks it up
+function applyUserTheme(user: AuthUser | null) {
+  if (user?.theme) {
+    localStorage.setItem('codesphere-theme', user.theme);
+    // Apply immediately to the document
+    const root = document.documentElement;
+    root.classList.remove(
+      'light', 'dark', 'system', 'star-trek', 'coding-vibe', 'cyberpunk',
+      'nature', 'ocean', 'sunset', 'matrix', 'retro', 'minimal'
+    );
+    root.classList.add(user.theme);
+  }
+}
+
 // ─── Context ──────────────────────────────────────────────────────────────────
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -55,6 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await fetch('/api/auth/me', { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
+        applyUserTheme(data.user);
         setUser(data.user);
       } else {
         setUser(null);
@@ -81,6 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { success: false, message: data.message || 'Login failed' };
       }
 
+      applyUserTheme(data.user);
       setUser(data.user);
       return { success: true };
     } catch {
@@ -103,6 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { success: false, message: data.message || 'Registration failed' };
       }
 
+      applyUserTheme(data.user);
       setUser(data.user);
       return { success: true };
     } catch {
@@ -118,7 +137,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     } finally {
       setUser(null);
-      window.location.href = '/';
     }
   };
 

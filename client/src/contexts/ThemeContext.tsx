@@ -15,34 +15,25 @@ interface ThemeProviderProps {
 }
 
 export function ThemeProvider({ children }: ThemeProviderProps) {
-  const [theme, setThemeState] = useState<Theme>('dark');
+  const [theme, setThemeState] = useState<Theme>('nature');
 
   useEffect(() => {
-    // Load theme from localStorage or user preferences
     const savedTheme = localStorage.getItem('codesphere-theme') as Theme;
     if (savedTheme) {
       setThemeState(savedTheme);
     } else {
-      // Default to dark theme
-      setThemeState('dark');
+      setThemeState('nature');
     }
   }, []);
 
   useEffect(() => {
-    // Apply theme to document
     const root = document.documentElement;
-    
-    // Remove all theme classes
     root.classList.remove(
       'light', 'dark', 'system',
-      'star-trek', 'coding-vibe', 'cyberpunk', 'nature', 
+      'star-trek', 'coding-vibe', 'cyberpunk', 'nature',
       'ocean', 'sunset', 'matrix', 'retro', 'minimal'
     );
-    
-    // Add the current theme class
     root.classList.add(theme);
-    
-    // Save to localStorage
     localStorage.setItem('codesphere-theme', theme);
   }, [theme]);
 
@@ -52,6 +43,13 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 
   const setTheme = (newTheme: Theme) => {
     setThemeState(newTheme);
+    // Persist to backend if user is logged in
+    fetch('/api/users/theme', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ theme: newTheme }),
+    }).catch(() => {}); // non-blocking, best-effort
   };
 
   return (

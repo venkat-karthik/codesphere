@@ -158,35 +158,35 @@
   --sidebar-ring: 180 100% 50%;
 }
 
-/* Nature Theme - Earth tones */
+/* Nature Theme - Rich earth & forest tones */
 .nature {
-  --background: 40 30% 95%;
-  --foreground: 40 30% 15%;
-  --card: 40 30% 98%;
-  --card-foreground: 40 30% 15%;
-  --popover: 40 30% 98%;
-  --popover-foreground: 40 30% 15%;
-  --primary: 120 50% 40%; /* Forest green */
-  --primary-foreground: 40 30% 95%;
-  --secondary: 40 30% 90%;
-  --secondary-foreground: 40 30% 15%;
-  --muted: 40 30% 90%;
-  --muted-foreground: 40 30% 45%;
-  --accent: 40 30% 90%;
-  --accent-foreground: 40 30% 15%;
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 40 30% 95%;
-  --border: 40 30% 85%;
-  --input: 40 30% 85%;
-  --ring: 120 50% 40%;
-  --sidebar-background: 40 30% 95%;
-  --sidebar-foreground: 40 30% 15%;
-  --sidebar-primary: 120 50% 40%;
-  --sidebar-primary-foreground: 40 30% 95%;
-  --sidebar-accent: 40 30% 90%;
-  --sidebar-accent-foreground: 40 30% 15%;
-  --sidebar-border: 40 30% 85%;
-  --sidebar-ring: 120 50% 40%;
+  --background: 78 20% 92%;          /* warm parchment */
+  --foreground: 100 30% 8%;          /* very dark forest — high contrast */
+  --card: 78 20% 96%;
+  --card-foreground: 100 30% 8%;
+  --popover: 78 20% 96%;
+  --popover-foreground: 100 30% 8%;
+  --primary: 142 50% 28%;            /* deep forest green */
+  --primary-foreground: 0 0% 98%;
+  --secondary: 78 18% 84%;
+  --secondary-foreground: 100 30% 10%;
+  --muted: 78 18% 86%;
+  --muted-foreground: 100 20% 35%;   /* readable muted text */
+  --accent: 35 60% 50%;              /* warm amber */
+  --accent-foreground: 0 0% 98%;
+  --destructive: 0 65% 40%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 78 18% 78%;
+  --input: 78 18% 78%;
+  --ring: 142 50% 28%;
+  --sidebar-background: 100 25% 15%; /* dark bark */
+  --sidebar-foreground: 78 30% 92%;  /* near-white for sidebar text */
+  --sidebar-primary: 142 55% 60%;    /* bright green for active items */
+  --sidebar-primary-foreground: 100 25% 8%;
+  --sidebar-accent: 100 22% 22%;
+  --sidebar-accent-foreground: 78 30% 92%;
+  --sidebar-border: 100 22% 22%;
+  --sidebar-ring: 142 55% 60%;
 }
 
 /* Ocean Theme - Blue tones */
@@ -385,11 +385,15 @@
 
 @layer components {
   .glass {
-    @apply bg-white/70 backdrop-blur-md border border-white/20 shadow-xl;
+    @apply bg-background/70 backdrop-blur-md border border-border/30 shadow-xl;
   }
   
   .dark .glass {
-    @apply bg-black/40 backdrop-blur-xl border border-white/10 shadow-2xl;
+    @apply bg-background/60 backdrop-blur-xl border border-border/20 shadow-2xl;
+  }
+
+  .nature .glass {
+    @apply bg-background/80 backdrop-blur-md border border-border/40 shadow-lg;
   }
 
   .glass-card {

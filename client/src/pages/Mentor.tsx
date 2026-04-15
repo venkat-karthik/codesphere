@@ -318,7 +318,7 @@ What programming topic can I help you with today?`;
                   key={message.id}
                   className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
-                  <div className={`flex space-x-2 max-w-[80%] ${
+                  <div className={`flex space-x-2 max-w-[75%] ${
                     message.type === 'user' ? 'flex-row-reverse space-x-reverse' : ''
                   }`}>
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
@@ -332,12 +332,12 @@ What programming topic can I help you with today?`;
                         <Bot className="h-4 w-4" />
                       )}
                     </div>
-                    <div className={`rounded-lg p-3 ${
+                    <div className={`px-3 py-2 rounded-2xl text-sm break-words whitespace-pre-wrap overflow-wrap-anywhere ${
                       message.type === 'user'
                         ? 'bg-primary text-primary-foreground'
                         : 'bg-muted'
                     }`}>
-                      <p className="text-sm">{message.content}</p>
+                      <p className="text-sm leading-relaxed break-words">{message.content}</p>
                       <p className={`text-xs mt-1 ${
                         message.type === 'user' 
                           ? 'text-primary-foreground/70' 

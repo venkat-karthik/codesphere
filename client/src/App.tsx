@@ -1,4 +1,4 @@
-import { useEffect, ReactNode } from 'react';
+import { useEffect } from 'react';
 import { Route, Switch, useLocation } from 'wouter';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { AnimatePresence } from 'framer-motion';
@@ -15,7 +15,6 @@ import { Dashboard } from './pages/Dashboard';
 import { Roadmaps } from './pages/Roadmaps';
 import { Resources } from './pages/Resources';
 import { Videos } from './pages/Videos';
-import TextTutorials from './pages/TextTutorials';
 import { Problems } from './pages/Problems';
 import { CommunityChannels } from './pages/CommunityChannels';
 import { Studio } from './pages/Studio';
@@ -25,9 +24,6 @@ import { EnhancedSettings } from './pages/EnhancedSettings';
 import { PlatformAnalytics } from './pages/PlatformAnalytics';
 import { LiveClasses } from './pages/LiveClasses';
 import { CodeCoinStore } from './pages/CodeCoinStore';
-import { SphereMap } from './pages/SphereMap';
-import { VideoCall } from './pages/VideoCall';
-import Welcome from './pages/Welcome';
 import AdminPDFResources from './pages/AdminPDFResources';
 import AdminVideoResources from './pages/AdminVideoResources';
 import AdminLiveClasses from './pages/AdminLiveClasses';
@@ -66,14 +62,6 @@ function AppContent() {
     );
   }
 
-  const Protected = ({ children }: { children: ReactNode }) => {
-    if (!isAuthenticated) {
-      setLocation('/');
-      return null;
-    }
-    return <>{children}</>;
-  };
-
   return (
     <NotificationsProvider>
       <AssignmentProvider>
@@ -82,22 +70,18 @@ function AppContent() {
             <Switch location={location} key={location}>
               {/* Student Routes */}
               <Route path="/" component={() => <PageTransition><Dashboard /></PageTransition>} />
-              <Route path="/welcome" component={() => <PageTransition><Welcome onOpenAuth={(mode) => {}} /></PageTransition>} />
-              <Route path="/dashboard" component={() => <PageTransition><Protected><Dashboard /></Protected></PageTransition>} />
-              <Route path="/learning/roadmaps" component={() => <PageTransition><Protected><Roadmaps /></Protected></PageTransition>} />
-              <Route path="/learning/resources" component={() => <PageTransition><Protected><Resources /></Protected></PageTransition>} />
-              <Route path="/learning/videos" component={() => <PageTransition><Protected><Videos /></Protected></PageTransition>} />
-              <Route path="/learning/tutorials" component={() => <PageTransition><Protected><TextTutorials /></Protected></PageTransition>} />
-              <Route path="/learning/live-classes" component={() => <PageTransition><Protected><LiveClasses /></Protected></PageTransition>} />
-              <Route path="/practice/problems" component={() => <PageTransition><Protected><Problems /></Protected></PageTransition>} />
-              <Route path="/community" component={() => <PageTransition><Protected><CommunityChannels /></Protected></PageTransition>} />
-              <Route path="/studio" component={() => <PageTransition><Protected><Studio /></Protected></PageTransition>} />
-              <Route path="/mentor" component={() => <PageTransition><Protected><Mentor /></Protected></PageTransition>} />
-              <Route path="/profile" component={() => <PageTransition><Protected><EnhancedProfile /></Protected></PageTransition>} />
-              <Route path="/settings" component={() => <PageTransition><Protected><EnhancedSettings /></Protected></PageTransition>} />
-              <Route path="/store" component={() => <PageTransition><Protected><CodeCoinStore /></Protected></PageTransition>} />
-              <Route path="/sphere-map" component={() => <PageTransition><Protected><SphereMap /></Protected></PageTransition>} />
-              <Route path="/video-call" component={() => <PageTransition><Protected><VideoCall roomId="lobby" isHost={false} onClose={() => {}} /></Protected></PageTransition>} />
+              <Route path="/dashboard" component={() => <PageTransition><Dashboard /></PageTransition>} />
+              <Route path="/learning/roadmaps" component={() => <PageTransition><Roadmaps /></PageTransition>} />
+              <Route path="/learning/resources" component={() => <PageTransition><Resources /></PageTransition>} />
+              <Route path="/learning/videos" component={() => <PageTransition><Videos /></PageTransition>} />
+              <Route path="/learning/live-classes" component={() => <PageTransition><LiveClasses /></PageTransition>} />
+              <Route path="/practice/problems" component={() => <PageTransition><Problems /></PageTransition>} />
+              <Route path="/community" component={() => <PageTransition><CommunityChannels /></PageTransition>} />
+              <Route path="/studio" component={() => <PageTransition><Studio /></PageTransition>} />
+              <Route path="/mentor" component={() => <PageTransition><Mentor /></PageTransition>} />
+              <Route path="/profile" component={() => <PageTransition><EnhancedProfile /></PageTransition>} />
+              <Route path="/settings" component={() => <PageTransition><EnhancedSettings /></PageTransition>} />
+              <Route path="/store" component={() => <PageTransition><CodeCoinStore /></PageTransition>} />
               <Route path="/privacy" component={() => <PageTransition><Privacy /></PageTransition>} />
               <Route path="/terms" component={() => <PageTransition><Terms /></PageTransition>} />
               <Route path="/verify-email" component={() => <PageTransition><VerifyEmail /></PageTransition>} />
@@ -106,27 +90,27 @@ function AppContent() {
               {/* Admin Routes */}
               <Route path="/admin/analytics">
                 <PageTransition>
-                  <Protected>{(isAdmin || isSubAdmin) ? <PlatformAnalytics /> : <Dashboard />}</Protected>
+                  {(isAdmin || isSubAdmin) ? <PlatformAnalytics /> : <Dashboard />}
                 </PageTransition>
               </Route>
               <Route path="/admin/resources">
                 <PageTransition>
-                  <Protected>{(isAdmin || isSubAdmin) ? <AdminPDFResources /> : <Dashboard />}</Protected>
+                  {(isAdmin || isSubAdmin) ? <AdminPDFResources /> : <Dashboard />}
                 </PageTransition>
               </Route>
               <Route path="/admin/videos">
                 <PageTransition>
-                  <Protected>{(isAdmin || isSubAdmin) ? <AdminVideoResources /> : <Dashboard />}</Protected>
+                  {(isAdmin || isSubAdmin) ? <AdminVideoResources /> : <Dashboard />}
                 </PageTransition>
               </Route>
               <Route path="/admin/live-classes">
                 <PageTransition>
-                  <Protected>{(isAdmin || isSubAdmin) ? <AdminLiveClasses /> : <Dashboard />}</Protected>
+                  {(isAdmin || isSubAdmin) ? <AdminLiveClasses /> : <Dashboard />}
                 </PageTransition>
               </Route>
               <Route path="/admin/sphere-map">
                 <PageTransition>
-                  <Protected>{(isAdmin || isSubAdmin) ? <AdminSphereMap /> : <Dashboard />}</Protected>
+                  {(isAdmin || isSubAdmin) ? <AdminSphereMap /> : <Dashboard />}
                 </PageTransition>
               </Route>
 

@@ -1,40 +1,18 @@
-import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState } from 'react';
+import { useLocation } from 'wouter';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { 
-  Bell, 
-  MessageSquare, 
-  Target, 
-  Bot, 
-  Trophy, 
-  Calendar,
-  Clock,
-  CheckCircle,
-  X,
-  Filter,
-  Settings,
-  BookOpen,
-  Users,
-  Star,
-  AlertCircle,
-  Info,
-  Video,
-  Trash2
+import {
+  Bell, MessageSquare, Target, Bot, Trophy, Clock,
+  CheckCircle, Settings, Info, Video, Trash2
 } from 'lucide-react';
 import { useNotifications } from '@/contexts/NotificationsContext';
 
 export function NotificationsPanel({ className }: { className?: string }) {
+  const [, setLocation] = useLocation();
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [showRead, setShowRead] = useState(true);
-  const { 
-    notifications, 
-    unreadCount, 
-    highPriorityCount, 
-    markAsRead, 
-    markAllAsRead, 
-    deleteNotification 
-  } = useNotifications();
+  const { notifications, unreadCount, highPriorityCount, markAsRead, markAllAsRead, deleteNotification } = useNotifications();
 
   const filters = [
     { id: 'all', label: 'All', icon: Bell },
@@ -44,241 +22,146 @@ export function NotificationsPanel({ className }: { className?: string }) {
     { id: 'achievement', label: 'Achievements', icon: Trophy },
     { id: 'reminder', label: 'Reminders', icon: Clock },
     { id: 'live-class', label: 'Live Classes', icon: Video },
-    { id: 'system', label: 'System', icon: Info }
+    { id: 'system', label: 'System', icon: Info },
   ];
 
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case 'assignment': return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
-      case 'message': return 'bg-green-500/20 text-green-400 border-green-500/30';
-      case 'ai-mentor': return 'bg-purple-500/20 text-purple-400 border-purple-500/30';
-      case 'achievement': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
-      case 'reminder': return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
-      case 'live-class': return 'bg-red-500/20 text-red-400 border-red-500/30';
-      case 'system': return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
-      default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
-    }
+  const typeColors: Record<string, string> = {
+    assignment: 'bg-blue-500/20 text-blue-500',
+    message: 'bg-green-500/20 text-green-500',
+    'ai-mentor': 'bg-purple-500/20 text-purple-500',
+    achievement: 'bg-yellow-500/20 text-yellow-500',
+    reminder: 'bg-orange-500/20 text-orange-500',
+    'live-class': 'bg-red-500/20 text-red-500',
+    system: 'bg-gray-500/20 text-gray-400',
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high': return 'bg-red-500/20 text-red-400';
-      case 'medium': return 'bg-yellow-500/20 text-yellow-400';
-      case 'low': return 'bg-green-500/20 text-green-400';
-      default: return 'bg-gray-500/20 text-gray-400';
-    }
+  const priorityColors: Record<string, string> = {
+    high: 'bg-red-500/20 text-red-500',
+    medium: 'bg-yellow-500/20 text-yellow-600',
+    low: 'bg-green-500/20 text-green-600',
   };
 
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'assignment': return Target;
-      case 'message': return MessageSquare;
-      case 'ai-mentor': return Bot;
-      case 'achievement': return Trophy;
-      case 'reminder': return Clock;
-      case 'live-class': return Video;
-      case 'system': return Info;
-      default: return Bell;
-    }
+  const typeIcons: Record<string, any> = {
+    assignment: Target, message: MessageSquare, 'ai-mentor': Bot,
+    achievement: Trophy, reminder: Clock, 'live-class': Video, system: Info,
   };
 
   const formatTimeAgo = (date: Date) => {
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
+    const diff = Date.now() - new Date(date).getTime();
+    const m = Math.floor(diff / 60000);
+    const h = Math.floor(diff / 3600000);
+    const d = Math.floor(diff / 86400000);
+    if (m < 1) return 'Just now';
+    if (m < 60) return `${m}m ago`;
+    if (h < 24) return `${h}h ago`;
+    if (d < 7) return `${d}d ago`;
+    return new Date(date).toLocaleDateString();
   };
 
-  const filteredNotifications = notifications.filter(notification => {
-    const matchesFilter = selectedFilter === 'all' || notification.type === selectedFilter;
-    const matchesRead = showRead || !notification.read;
-    return matchesFilter && matchesRead;
+  const filtered = notifications.filter(n => {
+    const matchFilter = selectedFilter === 'all' || n.type === selectedFilter;
+    const matchRead = showRead || !n.read;
+    return matchFilter && matchRead;
   });
 
-  const handleNotificationClick = (notification: any) => {
-    if (!notification.read) {
-      markAsRead(notification.id);
-    }
-    
-    if (notification.actionUrl) {
-      // Navigate to the action URL
-      window.location.href = notification.actionUrl;
-    }
-  };
-
-  const handleDeleteNotification = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    deleteNotification(id);
+  const handleClick = (n: any) => {
+    if (!n.read) markAsRead(n.id);
+    if (n.actionUrl) setLocation(n.actionUrl);
   };
 
   return (
-    <div className={`space-y-4 ${className}`}>
-      {/* Header with Stats */}
+    <div className={`space-y-4 ${className ?? ''}`}>
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <Bell className="h-5 w-5" />
-          <span className="font-semibold">Notifications</span>
-          {unreadCount > 0 && (
-            <Badge variant="destructive" className="text-xs">
-              {unreadCount} new
-            </Badge>
-          )}
-          {highPriorityCount > 0 && (
-            <Badge variant="destructive" className="text-xs">
-              {highPriorityCount} urgent
-            </Badge>
-          )}
+        <div className="flex items-center gap-2">
+          {unreadCount > 0 && <Badge variant="destructive" className="text-xs">{unreadCount} new</Badge>}
+          {highPriorityCount > 0 && <Badge className="bg-red-500/20 text-red-500 text-xs border-0">{highPriorityCount} urgent</Badge>}
         </div>
-        <div className="flex items-center space-x-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={markAllAsRead}
-            disabled={unreadCount === 0}
-          >
-            <CheckCircle className="h-4 w-4 mr-1" />
-            Mark all read
-          </Button>
-        </div>
+        <Button variant="ghost" size="sm" onClick={markAllAsRead} disabled={unreadCount === 0}>
+          <CheckCircle className="h-4 w-4 mr-1" />Mark all read
+        </Button>
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex flex-wrap gap-2">
-        {filters.map((filter) => {
-          const IconComponent = filter.icon;
-          const count = notifications.filter(n => 
-            filter.id === 'all' ? true : n.type === filter.id
-          ).length;
-          
+      <div className="flex gap-1.5 flex-wrap">
+        {filters.map(f => {
+          const Icon = f.icon;
+          const count = notifications.filter(n => f.id === 'all' ? true : n.type === f.id).length;
           return (
-            <Button
-              key={filter.id}
-              variant={selectedFilter === filter.id ? "default" : "outline"}
-              size="sm"
-              onClick={() => setSelectedFilter(filter.id)}
-              className="flex items-center space-x-1"
-            >
-              <IconComponent className="h-3 w-3" />
-              <span>{filter.label}</span>
-              {count > 0 && (
-                <Badge variant="secondary" className="ml-1 text-xs">
-                  {count}
-                </Badge>
-              )}
+            <Button key={f.id} variant={selectedFilter === f.id ? 'default' : 'outline'}
+              size="sm" className="h-7 px-2 text-xs gap-1"
+              onClick={() => setSelectedFilter(f.id)}>
+              <Icon className="h-3 w-3" />{f.label}
+              {count > 0 && <span className="opacity-70">({count})</span>}
             </Button>
           );
         })}
       </div>
 
-      {/* Show Read Toggle */}
-      <div className="flex items-center space-x-2">
-        <input
-          type="checkbox"
-          id="showRead"
-          checked={showRead}
-          onChange={(e) => setShowRead(e.target.checked)}
-          className="rounded"
-        />
-        <label htmlFor="showRead" className="text-sm text-muted-foreground">
-          Show read notifications
-        </label>
-      </div>
+      {/* Show read toggle */}
+      <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
+        <input type="checkbox" checked={showRead} onChange={e => setShowRead(e.target.checked)} className="rounded" />
+        Show read notifications
+      </label>
 
-      {/* Notifications List */}
-      <div className="space-y-3 max-h-96 overflow-y-auto">
-        {filteredNotifications.length === 0 ? (
-          <div className="text-center py-8">
-            <Bell className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No Notifications</h3>
-            <p className="text-muted-foreground">
-              {selectedFilter === 'all' 
-                ? 'You\'re all caught up!'
-                : `No ${selectedFilter} notifications found.`
-              }
+      {/* List */}
+      <div className="space-y-2">
+        {filtered.length === 0 ? (
+          <div className="text-center py-10">
+            <Bell className="h-10 w-10 text-muted-foreground mx-auto mb-3 opacity-30" />
+            <p className="text-sm text-muted-foreground">
+              {selectedFilter === 'all' ? "You're all caught up!" : `No ${selectedFilter} notifications.`}
             </p>
           </div>
-        ) : (
-          filteredNotifications.map((notification) => {
-            const IconComponent = getTypeIcon(notification.type);
-            
-            return (
-              <Card
-                key={notification.id}
-                className={`cursor-pointer transition-all duration-200 hover:shadow-md ${
-                  !notification.read ? 'border-primary/30 bg-primary/5' : ''
-                }`}
-                onClick={() => handleNotificationClick(notification)}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-start space-x-3">
-                    <div className={`p-2 rounded-lg ${getTypeColor(notification.type)}`}>
-                      <IconComponent className="h-4 w-4" />
+        ) : filtered.map(n => {
+          const Icon = typeIcons[n.type] || Bell;
+          return (
+            <div key={n.id}
+              className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all hover:shadow-sm ${
+                !n.read ? 'border-primary/30 bg-primary/5' : 'border-border bg-card'
+              }`}
+              onClick={() => handleClick(n)}>
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${typeColors[n.type] || 'bg-gray-500/20 text-gray-400'}`}>
+                <Icon className="h-4 w-4" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="text-sm font-semibold leading-tight">{n.title}</p>
+                      {!n.read && <span className="w-1.5 h-1.5 bg-primary rounded-full shrink-0" />}
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full ${priorityColors[n.priority] || ''}`}>{n.priority}</span>
                     </div>
-                    
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-2 mb-1">
-                            <h4 className="font-semibold text-sm">{notification.title}</h4>
-                            {!notification.read && (
-                              <div className="w-2 h-2 bg-primary rounded-full"></div>
-                            )}
-                            <Badge className={`text-xs ${getPriorityColor(notification.priority)}`}>
-                              {notification.priority}
-                            </Badge>
-                          </div>
-                          <p className="text-sm text-muted-foreground mb-2">
-                            {notification.message}
-                          </p>
-                          <div className="flex items-center space-x-4 text-xs text-muted-foreground">
-                            <span>{formatTimeAgo(notification.timestamp)}</span>
-                            {notification.sender && (
-                              <span>From: {notification.sender}</span>
-                            )}
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center space-x-1">
-                          {notification.actionUrl && (
-                            <Button size="sm" variant="ghost">
-                              <CheckCircle className="h-3 w-3" />
-                            </Button>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={(e) => handleDeleteNotification(e, notification.id)}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>
+                    <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                      <span>{formatTimeAgo(n.timestamp)}</span>
+                      {n.sender && <span>From: {n.sender}</span>}
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            );
-          })
-        )}
+                  <button className="shrink-0 p-1 rounded hover:bg-destructive/10 hover:text-destructive transition-colors"
+                    onClick={e => { e.stopPropagation(); deleteNotification(n.id); }}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                {n.actionUrl && (
+                  <button className="mt-1.5 text-xs text-primary hover:underline font-medium"
+                    onClick={e => { e.stopPropagation(); handleClick(n); }}>
+                    View →
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-between pt-4 border-t">
-        <span className="text-sm text-muted-foreground">
-          {filteredNotifications.length} notifications
-        </span>
-        <Button variant="ghost" size="sm">
-          <Settings className="h-4 w-4 mr-1" />
-          <span>Notification Settings</span>
+      <div className="flex items-center justify-between pt-3 border-t text-xs text-muted-foreground">
+        <span>{filtered.length} notification{filtered.length !== 1 ? 's' : ''}</span>
+        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setLocation('/settings')}>
+          <Settings className="h-3 w-3 mr-1" />Settings
         </Button>
       </div>
     </div>
   );
-} 
+}
