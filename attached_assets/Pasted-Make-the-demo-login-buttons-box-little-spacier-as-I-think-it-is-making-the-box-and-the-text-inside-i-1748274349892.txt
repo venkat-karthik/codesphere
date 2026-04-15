@@ -1,0 +1,22 @@
+Make the demo login buttons box little spacier as I think it is making the box and the text inside it too congestive,
+And in the admin user profile the student dashboard should contain the analysis about the students and their progress in learning their courses , it should not be about his coding journey 
+And in the admin dashboard , actually the dashboard is good but it would be better if you show the code sphere company’s growth and income through graphs so the admin or the founder gets a complete view on his website and also make the export data button functional in the dashboard so he download the analysis in pdf form 
+
+And I want you to generate sample roadmaps for frontend developer backend developer and full stack developer and insert them in the roadmaps section so when I press continue the student must be able to view the roadmap you created 
+And also I think it’s best if you refer roadmaps.sh and make the feature in our website similar to it.
+And take some random notes from the internet or you prepare one as a pdf and insert it in the pdf resources and make it available for the students to download it 
+
+And in the video library section make the upload video option enable and functional only for the admin user profile and the student user must only be able to open the video .i suggest you to pick some random videos from YouTube’s and upload them here so they are redirected to YouTube to watch them 
+
+And also make the daily problems page functional by adding some problem task by giving random code snippets and ask them to fill the output of that snippet and if they fill it correct it should show a ballon celebration animation to say it’s correct and a crying emoji animation to show it’s wrong 
+
+And in community lounge I am not able to message anything or add groups or create groups look into it please
+
+In project studio section let the new project button enabled so the students will be able to add their completed projects from their file manager ; so they can store their completed projects here safely
+
+And in sandbox make the preview more functional and realistic according to the typed code 
+
+And the ai mentor is not able to answer simple question like what is 2+3 also 
+I think you made it in such a way that it answers only fixed questions 
+
+In profile and settings add customisable theme options in appearances 
