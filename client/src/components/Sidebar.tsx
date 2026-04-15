@@ -170,11 +170,7 @@ export function Sidebar({ currentSection, onAuthModalOpen, mobileOpen, onMobileC
         initial={false}
         animate={isCollapsed ? "closed" : "open"}
         variants={sidebarVariants}
-<<<<<<< Updated upstream
-        className="fixed left-0 top-0 h-full glass border-r z-50 w-72 flex flex-col lg:translate-x-0"
-=======
         className="fixed left-0 top-0 h-full border-r border-sidebar-border z-50 w-72 flex flex-col bg-sidebar-background lg:!translate-x-0"
->>>>>>> Stashed changes
       >
         <div className="p-6 h-full flex flex-col overflow-y-auto scrollbar-hide">
           <div className="flex items-center justify-between mb-10">
