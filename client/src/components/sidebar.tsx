@@ -1,27 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useLocation, Link } from 'wouter';
 import { 
-  Home, 
-  Route as RoadmapIcon, 
-  FileText, 
-  Play, 
-  Users, 
-  Code, 
-  Puzzle, 
-  Bot, 
-  User, 
-  Settings,
-  LogOut,
-  X,
-  Flame,
-  Star,
-  BarChart3,
-  Video,
-  Store,
-  BookOpen,
-  Film,
-  Globe2,
-  ChevronRight,
+  Home, Route as RoadmapIcon, FileText, Play, Users, Code, Puzzle,
+  Bot, User, Settings, LogOut, X, Star, BarChart3, Video, Store,
+  Globe2, ChevronRight, BookText, Map, ShoppingBag, BookOpen
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/contexts/UserRoleContext';
@@ -133,22 +115,30 @@ export function Sidebar({ currentSection, onAuthModalOpen, mobileOpen, onMobileC
     );
   }
 
-  // Navigation data remains same but used with NavItem component
   const sections = [
-    { title: 'Home', items: [{ id: 'dashboard' as Section, icon: Home, label: 'Dashboard', path: '/dashboard' }] },
+    { title: 'Home', items: [
+      { id: 'dashboard' as Section, icon: Home, label: 'Dashboard', path: '/dashboard' },
+    ]},
     { title: 'Learn', items: [
       { id: 'roadmaps' as Section, icon: RoadmapIcon, label: 'Roadmaps', path: '/learning/roadmaps' },
+      { id: 'resources' as Section, icon: FileText, label: 'PDF Resources', path: '/learning/resources' },
       { id: 'videos' as Section, icon: Play, label: 'Video Library', path: '/learning/videos' },
+      { id: 'tutorials' as Section, icon: BookText, label: 'Text Tutorials', path: '/learning/tutorials' },
+      { id: 'live-classes' as Section, icon: Video, label: 'Live Classes', path: '/learning/live-classes' },
+      { id: 'sphere-map' as Section, icon: Globe2, label: 'Sphere Map', path: '/sphere-map' },
+    ]},
+    { title: 'Practice', items: [
       { id: 'problems' as Section, icon: Puzzle, label: 'Daily Problems', path: '/practice/problems' },
       { id: 'studio' as Section, icon: Code, label: 'Project Studio', path: '/studio' },
     ]},
     { title: 'Engage', items: [
       { id: 'community' as Section, icon: Users, label: 'Community', path: '/community' },
-      { id: 'live-classes' as Section, icon: Video, label: 'Live Classes', path: '/learning/live-classes' },
-    ]},
-    { title: 'Tools', items: [
       { id: 'mentor' as Section, icon: Bot, label: 'AI Mentor', path: '/mentor' },
-      { id: 'sandbox' as Section, icon: Code, label: 'App Sandbox', path: '/learning/sandbox' },
+    ]},
+    { title: 'Account', items: [
+      { id: 'profile' as Section, icon: User, label: 'Profile', path: '/profile' },
+      { id: 'store' as Section, icon: ShoppingBag, label: 'CodeCoin Store', path: '/store' },
+      { id: 'settings' as Section, icon: Settings, label: 'Settings', path: '/settings' },
     ]},
   ];
 

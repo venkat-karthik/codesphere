@@ -74,7 +74,25 @@ const TYPE_COLOR: Record<string, string> = {
 
 export function AssistantManagement() {
   const { toast } = useToast();
-  const [assistants, setAssistants] = useState<AssistantConfig[]>(DEFAULT_ASSISTANTS);
+  const qc = useQueryClient();
+
+  // Persist assistants in localStorage (DB endpoint not yet wired — persists across sessions)
+  const [assistants, setAssistants] = useState<AssistantConfig[]>(() => {
+    try {
+      const saved = localStorage.getItem('codesphere-assistants');
+      return saved ? JSON.parse(saved) : DEFAULT_ASSISTANTS;
+    } catch { return DEFAULT_ASSISTANTS; }
+  });
+
+  const persistAssistants = (updated: AssistantConfig[]) => {
+    setAssistants(updated);
+    localStorage.setItem('codesphere-assistants', JSON.stringify(updated));
+  };
+
+  // Real interaction count from users
+  const { data: users = [] } = useQuery<any[]>({ queryKey: ['/api/admin/users'] });
+  const totalInteractions = (users as any[]).reduce((s: number, u: any) => s + (u.totalStudyTime || 0), 0);
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -82,8 +100,6 @@ export function AssistantManagement() {
   const [testResult, setTestResult] = useState('');
   const [testingId, setTestingId] = useState<string | null>(null);
   const [isTesting, setIsTesting] = useState(false);
-
-  const [form, setForm] = useState({
     name: '',
     description: '',
     systemPrompt: '',
@@ -110,27 +126,23 @@ export function AssistantManagement() {
       return;
     }
     if (editingId) {
-      setAssistants(prev => prev.map(a => a.id === editingId ? { ...a, ...form } : a));
+      persistAssistants(assistants.map(a => a.id === editingId ? { ...a, ...form } : a));
       toast({ title: 'Assistant updated' });
     } else {
-      const newAssistant: AssistantConfig = {
-        ...form,
-        id: `assistant-${Date.now()}`,
-        createdAt: new Date().toISOString(),
-      };
-      setAssistants(prev => [...prev, newAssistant]);
+      const newAssistant: AssistantConfig = { ...form, id: `assistant-${Date.now()}`, createdAt: new Date().toISOString() };
+      persistAssistants([...assistants, newAssistant]);
       toast({ title: 'Assistant created' });
     }
     setIsDialogOpen(false);
   };
 
   const handleDelete = (id: string) => {
-    setAssistants(prev => prev.filter(a => a.id !== id));
+    persistAssistants(assistants.filter(a => a.id !== id));
     toast({ title: 'Assistant deleted' });
   };
 
   const handleToggle = (id: string) => {
-    setAssistants(prev => prev.map(a => a.id === id ? { ...a, isEnabled: !a.isEnabled } : a));
+    persistAssistants(assistants.map(a => a.id === id ? { ...a, isEnabled: !a.isEnabled } : a));
   };
 
   const handleTest = async (assistant: AssistantConfig) => {
@@ -167,7 +179,6 @@ export function AssistantManagement() {
   );
 
   const activeCount = assistants.filter(a => a.isEnabled).length;
-  const totalInteractions = 26680; // Would come from analytics in production
 
   return (
     <div className="space-y-8 p-6">

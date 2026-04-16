@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { pythonTutorial } from '@/data/tutorials/python';
 import { cTutorial } from '@/data/tutorials/c';
 import { javaTutorial } from '@/data/tutorials/java';
@@ -9,7 +10,9 @@ import CodeBlock from '@/components/CodeBlock';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { CheckCircle } from 'lucide-react';
+import { CheckCircle, Trophy } from 'lucide-react';
+import { apiRequest } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
 
 const tutorials = {
   python: pythonTutorial,
@@ -18,18 +21,47 @@ const tutorials = {
 };
 
 const TextTutorials = () => {
-  const { user, completeCourse } = useAuth();
+  const { user, updateUser } = useAuth();
+  const { toast } = useToast();
+  const qc = useQueryClient();
   const [activeLanguage, setActiveLanguage] = useState('python');
-  const [activeTopic, setActiveTopic] = useState(tutorials[activeLanguage].topics[0]);
+  const [activeTopic, setActiveTopic] = useState(tutorials['python'].topics[0]);
+  const [completedCourses, setCompletedCourses] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem(`completed-tutorials-${user?.id}`) || '[]')); }
+    catch { return new Set(); }
+  });
 
-  const handleLanguageChange = (lang) => {
+  const completeMutation = useMutation({
+    mutationFn: async (lang: string) => {
+      if (!user) throw new Error('Not logged in');
+      const xpEarned = 250;
+      // Award XP by updating user directly
+      const res = await apiRequest('PATCH', `/api/users/${user.id}`, {
+        xp: user.xp + xpEarned,
+        level: Math.floor((user.xp + xpEarned) / 1000) + 1,
+      });
+      return { lang, xpEarned, data: await res.json() };
+    },
+    onSuccess: ({ lang, xpEarned, data }) => {
+      updateUser({ xp: data.xp, level: data.level });
+      const next = new Set(completedCourses);
+      next.add(lang);
+      setCompletedCourses(next);
+      localStorage.setItem(`completed-tutorials-${user?.id}`, JSON.stringify(Array.from(next)));
+      qc.invalidateQueries({ queryKey: [`/api/analytics/users/${user?.id}`] });
+      toast({ title: `🎉 Course Complete! +${xpEarned} XP earned` });
+    },
+    onError: () => toast({ title: 'Failed to record completion', variant: 'destructive' }),
+  });
+
+  const handleLanguageChange = (lang: string) => {
     setActiveLanguage(lang);
     setActiveTopic(tutorials[lang].topics[0]);
-  }
+  };
 
   const currentTutorial = tutorials[activeLanguage];
 
-  const renderContent = (item, index) => {
+  const renderContent = (item: any, index: number) => {
     switch (item.type) {
       case 'header':
         return <h2 key={index} className="text-2xl font-bold mt-6 mb-3">{item.text}</h2>;
@@ -99,17 +131,20 @@ const TextTutorials = () => {
                             {/* Completion Button */}
                             {activeTopic.slug === tutorials[activeLanguage].topics[tutorials[activeLanguage].topics.length - 1].slug && (
                               <div className="mt-8 pt-6 border-t">
-                                {false ? (
-                                  <div className="flex items-center justify-center text-lg font-semibold text-green-500">
-                                    <CheckCircle className="h-6 w-6 mr-2" />
-                                    <span>Course Completed! You've earned 250 XP.</span>
+                                {completedCourses.has(activeLanguage) ? (
+                                  <div className="flex items-center justify-center gap-2 text-lg font-semibold text-green-500">
+                                    <CheckCircle className="h-6 w-6" />
+                                    <span>Course Completed! You earned 250 XP.</span>
                                   </div>
                                 ) : (
                                   <div className="text-center">
+                                    <Trophy className="h-12 w-12 text-yellow-500 mx-auto mb-3" />
                                     <h3 className="text-xl font-bold mb-2">You've reached the end!</h3>
                                     <p className="text-muted-foreground mb-4">Mark this course as complete to earn 250 XP and save your progress.</p>
-                                    <Button size="lg" onClick={() => completeCourse(activeLanguage)}>
-                                      Mark as Complete
+                                    <Button size="lg"
+                                      disabled={!user || completeMutation.isPending}
+                                      onClick={() => completeMutation.mutate(activeLanguage)}>
+                                      {completeMutation.isPending ? 'Saving...' : 'Mark as Complete — Earn 250 XP'}
                                     </Button>
                                   </div>
                                 )}

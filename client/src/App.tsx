@@ -28,6 +28,7 @@ import AdminPDFResources from './pages/AdminPDFResources';
 import AdminVideoResources from './pages/AdminVideoResources';
 import AdminLiveClasses from './pages/AdminLiveClasses';
 import AdminSphereMap from './pages/AdminSphereMap';
+import { SphereMap } from './pages/SphereMap';
 import { ResetPassword } from './pages/ResetPassword';
 import { Privacy } from './pages/Privacy';
 import { Terms } from './pages/Terms';
@@ -78,7 +79,8 @@ function AppContent() {
               <Route path="/practice/problems" component={() => <PageTransition><Problems /></PageTransition>} />
               <Route path="/community" component={() => <PageTransition><CommunityChannels /></PageTransition>} />
               <Route path="/studio" component={() => <PageTransition><Studio /></PageTransition>} />
-              <Route path="/mentor" component={() => <PageTransition><Mentor /></PageTransition>} />
+              <Route path="/mentor" component={() => <PageTransition><Protected><Mentor /></Protected></PageTransition>} />
+              <Route path="/sphere-map" component={() => <PageTransition><SphereMap /></PageTransition>} />
               <Route path="/profile" component={() => <PageTransition><EnhancedProfile /></PageTransition>} />
               <Route path="/settings" component={() => <PageTransition><EnhancedSettings /></PageTransition>} />
               <Route path="/store" component={() => <PageTransition><CodeCoinStore /></PageTransition>} />

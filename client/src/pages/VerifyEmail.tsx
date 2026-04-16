@@ -21,7 +21,7 @@ export function VerifyEmail() {
 
     const verify = async () => {
       try {
-        const res = await fetch(`/api/auth/verify-email?token=${token}`);
+        const res = await fetch(`/api/auth/verify-email?token=${token}`, { credentials: 'include' });
         if (res.ok) {
           setStatus('success');
           setMessage('Email verified successfully! Welcome to the premium tier.');

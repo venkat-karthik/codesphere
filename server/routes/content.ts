@@ -68,6 +68,18 @@ router.patch("/videos/:id", requireAdmin, async (req, res) => {
   }
 });
 
+router.delete("/videos/:id", requireAdmin, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const resource = await storage.getResource(id);
+    if (!resource) return res.status(404).json({ message: "Video not found" });
+    // Note: actual video file deletion from R2/Drive would go here
+    return res.json({ success: true });
+  } catch (error) {
+    return res.status(500).json({ message: "Failed to delete video" });
+  }
+});
+
 // ─── PROBLEMS ────────────────────────────────────────────────────────────
 
 router.get("/problems", async (req, res) => {

@@ -139,26 +139,21 @@ export function EnhancedSettings() {
     compactMode: false
   });
 
-  const [notifications, setNotifications] = useState({
-    emailNotifications: true,
-    pushNotifications: true,
-    desktopNotifications: true,
-    weeklyDigest: true,
-    courseUpdates: true,
-    communityMessages: true,
-    achievementAlerts: true,
-    reminderNotifications: true,
-    marketingEmails: false
+  const [notifications, setNotifications] = useState(() => {
+    const saved = (user as any)?.preferences?.notifications;
+    return saved || {
+      emailNotifications: true, pushNotifications: true, desktopNotifications: true,
+      weeklyDigest: true, courseUpdates: true, communityMessages: true,
+      achievementAlerts: true, reminderNotifications: true, marketingEmails: false,
+    };
   });
 
-  const [privacy, setPrivacy] = useState({
-    profileVisibility: 'public',
-    showProgress: true,
-    showAchievements: true,
-    showActivity: true,
-    allowDirectMessages: true,
-    showOnlineStatus: true,
-    dataCollection: true
+  const [privacy, setPrivacy] = useState(() => {
+    const saved = (user as any)?.preferences?.privacy;
+    return saved || {
+      profileVisibility: 'public', showProgress: true, showAchievements: true,
+      showActivity: true, allowDirectMessages: true, showOnlineStatus: true, dataCollection: true,
+    };
   });
 
   const [security, setSecurity] = useState({
@@ -174,15 +169,30 @@ export function EnhancedSettings() {
   };
 
   const handleSavePreferences = () => {
+    // Preferences (theme) are already saved via ThemeContext on change
     toast({ title: 'Preferences saved' });
   };
 
   const handleSaveNotifications = () => {
-    toast({ title: 'Notifications saved' });
+    if (!user) return;
+    apiRequest('PATCH', `/api/users/${user.id}`, {
+      preferences: {
+        ...(user as any).preferences,
+        notifications,
+      },
+    }).then(() => toast({ title: 'Notification settings saved' }))
+      .catch(() => toast({ title: 'Failed to save', variant: 'destructive' }));
   };
 
   const handleSavePrivacy = () => {
-    toast({ title: 'Privacy settings saved' });
+    if (!user) return;
+    apiRequest('PATCH', `/api/users/${user.id}`, {
+      preferences: {
+        ...(user as any).preferences,
+        privacy,
+      },
+    }).then(() => toast({ title: 'Privacy settings saved' }))
+      .catch(() => toast({ title: 'Failed to save', variant: 'destructive' }));
   };
 
   const handleSaveSecurity = () => {

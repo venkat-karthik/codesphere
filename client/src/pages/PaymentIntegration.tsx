@@ -108,6 +108,17 @@ export function PaymentIntegration() {
     enabled: !!user && user.id > 0,
   });
 
+  // Check if Razorpay is configured
+  const { data: payConfig } = useQuery<{ configured: boolean }>({
+    queryKey: ['/api/payments/config'],
+    queryFn: async () => {
+      const res = await fetch('/api/payments/config', { credentials: 'include' });
+      if (!res.ok) return { configured: false };
+      return res.json();
+    },
+  });
+  const razorpayConfigured = payConfig?.configured ?? false;
+
   const createOrderMutation = useMutation({
     mutationFn: async (planId: string) => {
       const key = billing === 'yearly' ? `${planId}-yearly` : planId;
@@ -191,6 +202,22 @@ export function PaymentIntegration() {
           {billing === 'yearly' && <Badge className="bg-green-100 text-green-800">Save up to 17%</Badge>}
         </div>
       </div>
+
+      {/* Razorpay not configured banner */}
+      {!razorpayConfigured && (
+        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 flex items-start gap-3">
+          <Lock className="h-5 w-5 text-yellow-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold text-yellow-700">Payment Gateway Not Configured</p>
+            <p className="text-sm text-yellow-600 mt-0.5">
+              Razorpay keys are not set in <code className="bg-yellow-500/20 px-1 rounded">.env</code>.
+              Add <code className="bg-yellow-500/20 px-1 rounded">RAZORPAY_KEY_ID</code> and{' '}
+              <code className="bg-yellow-500/20 px-1 rounded">RAZORPAY_KEY_SECRET</code> to enable payments.
+              Plan selection is shown for preview only.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Current plan banner */}
       <Card className="bg-gradient-to-r from-primary/5 to-purple-500/5 border-primary/20">

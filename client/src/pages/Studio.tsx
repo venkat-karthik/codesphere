@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,10 +6,12 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Code, Plus, FolderOpen, Clock, Users, GitBranch, Play, Settings, Search, Star, Trash2 } from 'lucide-react';
+import { Code, Plus, FolderOpen, Clock, Play, Search, Trash2, Eye, X } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { apiRequest } from '@/lib/queryClient';
+import MonacoEditor from '@monaco-editor/react';
 
 interface Project {
   id: number;
@@ -63,6 +65,31 @@ export function Studio() {
   const [filter, setFilter] = useState('all');
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ name: '', description: '', language: 'JavaScript', framework: 'React' });
+
+  // Live editor state
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [editorCode, setEditorCode] = useState('');
+  const [previewSrc, setPreviewSrc] = useState('');
+  const [editorLang, setEditorLang] = useState('javascript');
+
+  const openProject = (project: Project) => {
+    const isWeb = project.language === 'JavaScript' || project.language === 'TypeScript';
+    const lang = project.language.toLowerCase() === 'javascript' ? 'javascript'
+      : project.language.toLowerCase() === 'typescript' ? 'typescript'
+      : project.language.toLowerCase() === 'python' ? 'python'
+      : 'javascript';
+    const starter = isWeb
+      ? `<!DOCTYPE html>\n<html>\n<head>\n  <title>${project.name}</title>\n  <style>\n    body { font-family: sans-serif; padding: 20px; }\n  </style>\n</head>\n<body>\n  <h1>${project.name}</h1>\n  <p>Start coding here!</p>\n  <script>\n    // Your JavaScript here\n    console.log('${project.name} loaded');\n  </script>\n</body>\n</html>`
+      : `# ${project.name}\nprint("Hello from ${project.name}!")`;
+    setEditorCode(starter);
+    setEditorLang(isWeb ? 'html' : lang);
+    setPreviewSrc(isWeb ? starter : '');
+    setEditingProject(project);
+  };
+
+  const runPreview = () => {
+    if (editorLang === 'html') setPreviewSrc(editorCode);
+  };
 
   const { data: projects = [], isLoading } = useQuery<Project[]>({
     queryKey: ['/api/projects'],
@@ -205,11 +232,11 @@ export function Studio() {
                 </div>
 
                 <div className="flex gap-2 mt-4">
-                  <Button className="flex-1">
+                  <Button className="flex-1" onClick={() => openProject(project)}>
                     <Play className="mr-2 h-4 w-4" /> Open Project
                   </Button>
-                  <Button variant="outline">
-                    <FolderOpen className="mr-2 h-4 w-4" /> Files
+                  <Button variant="outline" onClick={() => openProject(project)}>
+                    <Eye className="mr-2 h-4 w-4" /> Preview
                   </Button>
                 </div>
               </CardContent>
@@ -238,9 +265,66 @@ export function Studio() {
         </CardContent></Card>
       </div>
 
+      {/* Live Editor Modal */}
+      <Dialog open={!!editingProject} onOpenChange={open => !open && setEditingProject(null)}>
+        <DialogContent className="max-w-6xl w-full h-[85vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="px-4 py-3 border-b flex-row items-center justify-between">
+            <DialogTitle className="flex items-center gap-2">
+              <Code className="h-4 w-4" />{editingProject?.name}
+              <Badge variant="outline" className="text-xs">{editingProject?.language}</Badge>
+            </DialogTitle>
+            <div className="flex items-center gap-2">
+              {editorLang === 'html' && (
+                <Button size="sm" onClick={runPreview}>
+                  <Play className="h-3.5 w-3.5 mr-1.5" />Run Preview
+                </Button>
+              )}
+              <Button size="sm" variant="ghost" onClick={() => setEditingProject(null)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </DialogHeader>
+          <div className="flex flex-1 overflow-hidden">
+            {/* Editor */}
+            <div className={`flex flex-col ${editorLang === 'html' ? 'w-1/2' : 'w-full'} border-r`}>
+              <div className="px-3 py-1.5 bg-muted/30 border-b text-xs text-muted-foreground font-mono">
+                {editingProject?.name}.{editorLang === 'html' ? 'html' : editorLang === 'python' ? 'py' : 'js'}
+              </div>
+              <div className="flex-1">
+                <MonacoEditor
+                  height="100%"
+                  language={editorLang}
+                  value={editorCode}
+                  onChange={v => {
+                    setEditorCode(v || '');
+                    if (editorLang === 'html') setPreviewSrc(v || '');
+                  }}
+                  theme="vs-dark"
+                  options={{ minimap: { enabled: false }, fontSize: 13, wordWrap: 'on', automaticLayout: true }}
+                />
+              </div>
+            </div>
+            {/* Live Preview — only for HTML/JS projects */}
+            {editorLang === 'html' && (
+              <div className="w-1/2 flex flex-col">
+                <div className="px-3 py-1.5 bg-muted/30 border-b text-xs text-muted-foreground font-mono flex items-center gap-2">
+                  <Eye className="h-3 w-3" />Live Preview
+                  <span className="ml-auto text-green-500">● Auto-updating</span>
+                </div>
+                <iframe
+                  className="flex-1 bg-white"
+                  srcDoc={previewSrc}
+                  sandbox="allow-scripts allow-same-origin"
+                  title="preview"
+                />
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Create Modal */}
-      <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent>
+      <Dialog open={showModal} onOpenChange={setShowModal}>        <DialogContent>
           <DialogHeader>
             <DialogTitle>New Project</DialogTitle>
             <DialogDescription>Give your project a name and pick a language.</DialogDescription>

@@ -48,6 +48,45 @@ export function CommunityChannels() {
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
   const [socket, setSocket] = useState<Socket | null>(null);
   const [connected, setConnected] = useState(false);
+
+  // Reactions stored in localStorage per message
+  const [reactions, setReactions] = useState<Record<string | number, Record<string, number>>>(() => {
+    try { return JSON.parse(localStorage.getItem('msg-reactions') || '{}'); }
+    catch { return {}; }
+  });
+  const [myReactions, setMyReactions] = useState<Record<string | number, string>>(() => {
+    try { return JSON.parse(localStorage.getItem(`my-reactions-${user?.id}`) || '{}'); }
+    catch { return {}; }
+  });
+
+  const EMOJIS = ['👍', '❤️', '😂', '🔥', '🎉'];
+
+  const toggleReaction = (msgId: string | number, emoji: string) => {
+    const current = myReactions[msgId];
+    const newMyReactions = { ...myReactions };
+    const newReactions = { ...reactions };
+    if (!newReactions[msgId]) newReactions[msgId] = {};
+
+    if (current === emoji) {
+      // Remove reaction
+      delete newMyReactions[msgId];
+      newReactions[msgId][emoji] = Math.max(0, (newReactions[msgId][emoji] || 1) - 1);
+      if (newReactions[msgId][emoji] === 0) delete newReactions[msgId][emoji];
+    } else {
+      // Remove old, add new
+      if (current) {
+        newReactions[msgId][current] = Math.max(0, (newReactions[msgId][current] || 1) - 1);
+        if (newReactions[msgId][current] === 0) delete newReactions[msgId][current];
+      }
+      newMyReactions[msgId] = emoji;
+      newReactions[msgId][emoji] = (newReactions[msgId][emoji] || 0) + 1;
+    }
+
+    setMyReactions(newMyReactions);
+    setReactions(newReactions);
+    localStorage.setItem('msg-reactions', JSON.stringify(newReactions));
+    localStorage.setItem(`my-reactions-${user?.id}`, JSON.stringify(newMyReactions));
+  };
   const [showNewChannelModal, setShowNewChannelModal] = useState(false);
   const [newChannelName, setNewChannelName] = useState('');
   const [newChannelType, setNewChannelType] = useState<'text' | 'voice'>('text');
@@ -330,6 +369,29 @@ export function CommunityChannels() {
                       )}
                       <div className={`px-3 py-2 rounded-2xl text-sm break-words ${isMe ? 'bg-primary text-primary-foreground rounded-tr-sm' : 'bg-muted rounded-tl-sm'}`}>
                         {msg.content}
+                      </div>
+                      {/* Reactions */}
+                      <div className={`flex items-center gap-1 mt-1 flex-wrap ${isMe ? 'justify-end' : ''}`}>
+                        {/* Existing reactions */}
+                        {reactions[msg.id] && Object.entries(reactions[msg.id]).map(([emoji, count]) => (
+                          count > 0 && (
+                            <button key={emoji}
+                              className={`text-xs px-1.5 py-0.5 rounded-full border transition-all ${myReactions[msg.id] === emoji ? 'bg-primary/20 border-primary/40' : 'bg-muted/50 border-border hover:bg-muted'}`}
+                              onClick={() => toggleReaction(msg.id, emoji)}>
+                              {emoji} {count}
+                            </button>
+                          )
+                        ))}
+                        {/* Add reaction — show on hover */}
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5">
+                          {EMOJIS.map(e => (
+                            <button key={e}
+                              className="text-xs w-6 h-6 rounded-full hover:bg-muted flex items-center justify-center transition-colors"
+                              onClick={() => toggleReaction(msg.id, e)}>
+                              {e}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </div>

@@ -61,7 +61,7 @@ export function OtpVerification() {
     setIsSending(true);
     setError('');
     try {
-      const res = await fetch('/api/auth/send-verification', { method: 'POST' });
+      const res = await fetch('/api/auth/send-verification', { method: 'POST', credentials: 'include' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
       setSent(true);
@@ -84,6 +84,7 @@ export function OtpVerification() {
       const res = await fetch('/api/auth/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ otp: code }),
       });
       const data = await res.json();

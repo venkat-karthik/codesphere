@@ -24,8 +24,11 @@ export function CodeCoinStore() {
   const qc = useQueryClient();
   const [selectedItem, setSelectedItem] = useState<StoreItem | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  // Track purchased items in session (would be persisted in a purchases table in Phase 5)
-  const [purchased, setPurchased] = useState<string[]>([]);
+  // Track purchased items — persisted in localStorage per user
+  const [purchased, setPurchased] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem(`store-purchased-${user?.id}`) || '[]'); }
+    catch { return []; }
+  });
 
   const { data: items = [], isLoading } = useQuery<StoreItem[]>({
     queryKey: ['/api/store/items'],
@@ -37,7 +40,9 @@ export function CodeCoinStore() {
       return res.json();
     },
     onSuccess: (data, item) => {
-      setPurchased(prev => [...prev, item.id]);
+      const next = [...purchased, item.id];
+      setPurchased(next);
+      localStorage.setItem(`store-purchased-${user?.id}`, JSON.stringify(next));
       updateUser({ codeCoins: data.remainingCoins } as any);
       toast({ title: 'Unlocked!', description: `You unlocked "${item.title}".` });
       setIsModalOpen(false);

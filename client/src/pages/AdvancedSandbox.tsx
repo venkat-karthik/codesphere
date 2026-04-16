@@ -1,13 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import MonacoEditor from '@monaco-editor/react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Plus, Trash, Play, Terminal, FileText, Folder, FolderOpen, ChevronDown, ChevronRight, Edit2 } from 'lucide-react';
+import { Plus, Trash, Play, Terminal, FileText, Folder, ChevronDown, ChevronRight, Edit2, Save, Cloud } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import JSZip from 'jszip';
 import QRCode from 'react-qr-code';
 import { Tooltip, TooltipProvider } from '@/components/ui/tooltip';
 import DOMPurify from 'dompurify';
+import { useAuth } from '@/hooks/useAuth';
+import { apiRequest } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
 
 // Supported languages and their starter files
 const LANGUAGE_STARTERS = {
@@ -66,6 +70,9 @@ const FILE_LANGUAGES = [
 ];
 
 export default function AdvancedSandbox() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const qc = useQueryClient();
   const [tree, setTree] = useState(DEFAULT_TREE);
   const [flatView, setFlatView] = useState(false);
   const [activeFileId, setActiveFileId] = useState(tree[0].children[0].id);
@@ -89,6 +96,50 @@ export default function AdvancedSandbox() {
   const [recentProjects, setRecentProjects] = useState(() => JSON.parse(localStorage.getItem('recentProjects') || '[]'));
   const [theme, setTheme] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   const [stdinInput, setStdinInput] = useState('');
+  const [savedProjectId, setSavedProjectId] = useState<number | null>(null);
+
+  // Load saved projects from DB
+  const { data: dbProjects = [] } = useQuery<any[]>({
+    queryKey: ['/api/projects'],
+    enabled: !!user,
+  });
+
+  // Save project to DB
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const payload = {
+        name: projectInfo.name,
+        description: projectInfo.description || null,
+        language: 'JavaScript',
+        type: 'custom',
+        sourceCode: tree,
+      };
+      if (savedProjectId) {
+        const res = await apiRequest('PATCH', `/api/projects/${savedProjectId}`, payload);
+        return res.json();
+      }
+      const res = await apiRequest('POST', '/api/projects', payload);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setSavedProjectId(data.id);
+      qc.invalidateQueries({ queryKey: ['/api/projects'] });
+      toast({ title: '✅ Project saved to cloud' });
+    },
+    onError: () => toast({ title: 'Save failed', variant: 'destructive' }),
+  });
+
+  // Load a project from DB into the sandbox
+  const loadProject = (project: any) => {
+    if (project.sourceCode) {
+      setTree(project.sourceCode);
+      setProjectInfo({ name: project.name, description: project.description || '', tags: '' });
+      setSavedProjectId(project.id);
+      const firstFile = flattenTree(project.sourceCode).find((n: any) => n.type === 'file');
+      if (firstFile) setActiveFileId(firstFile.id);
+      toast({ title: `Loaded: ${project.name}` });
+    }
+  };
 
   // Theme sync
   React.useEffect(() => {
@@ -449,7 +500,7 @@ export default function AdvancedSandbox() {
     function handler(e) {
       if (e.ctrlKey && e.key === 'o') { setShowImportModal(true); e.preventDefault(); }
       if (e.ctrlKey && e.key === 'e') { handleExportZip(); e.preventDefault(); }
-      if (e.ctrlKey && e.key === 's') { handleShare(); e.preventDefault(); }
+      if (e.ctrlKey && e.key === 's') { saveMutation.mutate(); e.preventDefault(); }
       if (e.ctrlKey && e.key === 'i') { setShowProjectInfo(true); e.preventDefault(); }
     }
     window.addEventListener('keydown', handler);
@@ -489,6 +540,7 @@ export default function AdvancedSandbox() {
         <div className="w-64 bg-muted border-r flex flex-col">
           {/* Actions Row */}
           <div className="flex gap-2 px-2 pt-3 pb-2 border-b overflow-x-auto scrollbar-thin scrollbar-thumb-rounded scrollbar-thumb-muted-foreground/30">
+            <Tooltip content="Save to Cloud"><Button size="icon" variant="ghost" onClick={() => saveMutation.mutate()} disabled={!user || saveMutation.isPending}><Save size={16} className={saveMutation.isPending ? 'animate-spin' : ''} /></Button></Tooltip>
             <Tooltip content="Export as ZIP"><Button size="icon" variant="ghost" onClick={handleExportZip}><svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 17v-6m0 0l-3 3m3-3l3 3"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg></Button></Tooltip>
             <Tooltip content="Share (Copy JSON)"><Button size="icon" variant="ghost" onClick={handleShare}><svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/></svg></Button></Tooltip>
             <Tooltip content="Share via QR Code"><Button size="icon" variant="ghost" onClick={() => setShowQRModal(true)}><svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg></Button></Tooltip>
@@ -509,12 +561,26 @@ export default function AdvancedSandbox() {
               {flatView ? renderFlatList() : renderTree(tree)}
             </div>
           </DragDropContext>
-          {/* Recent Projects */}
+          {/* Cloud Projects */}
           <div className="p-2 border-t">
-            <div className="font-bold text-xs mb-1">Recent Projects</div>
-            {recentProjects.map((p, i) => (
-              <div key={i} className="text-xs cursor-pointer hover:underline" onClick={() => { setTree(p.tree); setProjectInfo(p.projectInfo); }}>{p.name}</div>
-            ))}
+            <div className="flex items-center gap-1 mb-2">
+              <Cloud size={12} className="text-primary" />
+              <span className="font-bold text-xs text-primary">Cloud Projects</span>
+            </div>
+            {!user ? (
+              <p className="text-xs text-muted-foreground">Sign in to save projects</p>
+            ) : (dbProjects as any[]).filter((p: any) => p.sourceCode).length === 0 ? (
+              <p className="text-xs text-muted-foreground">No saved projects yet</p>
+            ) : (
+              (dbProjects as any[]).filter((p: any) => p.sourceCode).map((p: any) => (
+                <div key={p.id}
+                  className={`text-xs cursor-pointer hover:text-primary py-1 px-1 rounded flex items-center gap-1 ${savedProjectId === p.id ? 'text-primary font-semibold' : ''}`}
+                  onClick={() => loadProject(p)}>
+                  <FileText size={10} />{p.name}
+                  {savedProjectId === p.id && <span className="ml-auto text-[10px] text-green-500">active</span>}
+                </div>
+              ))
+            )}
           </div>
         </div>
       </TooltipProvider>

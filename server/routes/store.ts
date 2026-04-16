@@ -19,11 +19,11 @@ router.get("/items", async (_req, res) => {
 // Purchase item
 router.post("/purchase/:itemId", requireAuth, async (req, res) => {
   try {
-    if (req.session.userId! <= 0) {
-      return res.status(400).json({ message: "Demo accounts cannot make purchases" });
-    }
     const user = await storage.getUser(req.session.userId!);
     if (!user) return res.status(404).json({ message: "User not found" });
+    if (user.email === 'admin@codesphere.com' || user.email === 'student@codesphere.com') {
+      return res.status(400).json({ message: "Demo accounts cannot make purchases" });
+    }
 
     const PRICES: Record<string, number> = {
       'css-cheatsheet': 30, 'react-template': 100, 'nodejs-notes': 50,

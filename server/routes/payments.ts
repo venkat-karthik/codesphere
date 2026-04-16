@@ -117,4 +117,10 @@ router.get("/history", requireAuth, async (req, res) => {
   }
 });
 
+// Check if Razorpay is configured
+router.get("/config", (_req, res) => {
+  const configured = !!(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET);
+  return res.json({ configured });
+});
+
 export default router;

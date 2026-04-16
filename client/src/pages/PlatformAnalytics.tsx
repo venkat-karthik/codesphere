@@ -33,33 +33,6 @@ interface AdminUser {
   totalStudyTime: number;
 }
 
-const revenueData = [
-  { month: 'Jan', revenue: 4000, expenses: 2400 },
-  { month: 'Feb', revenue: 3000, expenses: 1398 },
-  { month: 'Mar', revenue: 5000, expenses: 6800 },
-  { month: 'Apr', revenue: 4780, expenses: 3908 },
-  { month: 'May', revenue: 6890, expenses: 4800 },
-  { month: 'Jun', revenue: 7390, expenses: 3800 },
-];
-
-const subscriptionData = [
-  { name: 'Jan', Pro: 400, Premium: 240 },
-  { name: 'Feb', Pro: 300, Premium: 139 },
-  { name: 'Mar', Pro: 200, Premium: 480 },
-  { name: 'Apr', Pro: 278, Premium: 390 },
-  { name: 'May', Pro: 189, Premium: 480 },
-  { name: 'Jun', Pro: 239, Premium: 380 },
-];
-
-const kpiData = {
-    mrr: { value: 7390, change: 12.5, period: "last month" },
-    activeSubscriptions: { value: 619, change: 5.2, period: "last month" },
-    arpu: { value: 11.94, change: 2.1, period: "last month" },
-    churnRate: { value: 2.3, change: -0.5, period: "last month" },
-    ltv: { value: 245, change: 15, period: "last year" },
-    cac: { value: 42, change: 3, period: "last month" },
-}
-
 export function PlatformAnalytics() {
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -79,12 +52,40 @@ export function PlatformAnalytics() {
   });
 
   const { data: problems = [] } = useQuery<any[]>({
-    queryKey: ['/api/problems'],
+    queryKey: ['/api/content/problems'],
   });
 
   const { data: roadmaps = [] } = useQuery<any[]>({
     queryKey: ['/api/roadmaps'],
   });
+
+  // Build real activity chart from user data
+  const userGrowthData = React.useMemo(() => {
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const now = new Date();
+    return Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
+      const label = months[d.getMonth()];
+      const count = (users as AdminUser[]).filter(u => {
+        const joined = new Date((u as any).joinDate || 0);
+        return joined.getFullYear() === d.getFullYear() && joined.getMonth() === d.getMonth();
+      }).length;
+      return { month: label, Users: count };
+    });
+  }, [users]);
+
+  const xpDistData = React.useMemo(() => {
+    const buckets = [
+      { name: '0–500', min: 0, max: 500 },
+      { name: '500–1k', min: 500, max: 1000 },
+      { name: '1k–5k', min: 1000, max: 5000 },
+      { name: '5k+', min: 5000, max: Infinity },
+    ];
+    return buckets.map(b => ({
+      name: b.name,
+      Users: (users as AdminUser[]).filter(u => u.xp >= b.min && u.xp < b.max).length,
+    }));
+  }, [users]);
 
   const deleteUserMutation = useMutation({
     mutationFn: async (id: number) => { await apiRequest('DELETE', `/api/admin/users/${id}`); },
@@ -107,7 +108,7 @@ export function PlatformAnalytics() {
       return res.json();
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['/api/problems'] });
+      qc.invalidateQueries({ queryKey: ['/api/content/problems'] });
       setShowProblemModal(false);
       setProblemForm({ title: '', description: '', difficulty: 'Easy', category: 'Arrays', xpReward: '100', hints: '', solution: '' });
       toast({ title: 'Problem created' });
@@ -172,7 +173,23 @@ export function PlatformAnalytics() {
           <h1 className="text-3xl font-bold">Admin Panel</h1>
           <p className="text-muted-foreground">Manage your platform and users.</p>
         </div>
-        <Button><Download className="mr-2 h-4 w-4" />Export Report</Button>
+        <Button onClick={() => {
+          const rows = [
+            ['Name', 'Email', 'Role', 'Level', 'XP', 'Streak', 'Subscription', 'Study Time (min)'],
+            ...(users as AdminUser[]).map(u => [
+              `${u.firstName} ${u.lastName}`, u.email, u.role,
+              u.level, u.xp, u.streak, u.subscriptionType, u.totalStudyTime
+            ])
+          ];
+          const csv = rows.map(r => r.join(',')).join('\n');
+          const blob = new Blob([csv], { type: 'text/csv' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url; a.download = `codesphere-users-${new Date().toISOString().slice(0,10)}.csv`;
+          a.click(); URL.revokeObjectURL(url);
+        }}>
+          <Download className="mr-2 h-4 w-4" />Export Report
+        </Button>
       </div>
 
       <Tabs value={selectedTab} onValueChange={setSelectedTab}>
@@ -221,29 +238,27 @@ export function PlatformAnalytics() {
 
           <div className="grid lg:grid-cols-2 gap-6">
             <Card>
-              <CardHeader><CardTitle>Revenue vs. Expenses</CardTitle></CardHeader>
+              <CardHeader><CardTitle>User Growth (Last 6 Months)</CardTitle></CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={revenueData}>
+                  <LineChart data={userGrowthData}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" /><YAxis />
+                    <XAxis dataKey="month" /><YAxis allowDecimals={false} />
                     <Tooltip /><Legend />
-                    <Line type="monotone" dataKey="revenue" stroke="#8884d8" activeDot={{ r: 8 }} />
-                    <Line type="monotone" dataKey="expenses" stroke="#82ca9d" />
+                    <Line type="monotone" dataKey="Users" stroke="#8884d8" activeDot={{ r: 8 }} />
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
             <Card>
-              <CardHeader><CardTitle>Subscription Growth</CardTitle></CardHeader>
+              <CardHeader><CardTitle>XP Distribution</CardTitle></CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={subscriptionData}>
+                  <LineChart data={xpDistData}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" /><YAxis />
+                    <XAxis dataKey="name" /><YAxis allowDecimals={false} />
                     <Tooltip /><Legend />
-                    <Line type="monotone" dataKey="Pro" stroke="#8884d8" />
-                    <Line type="monotone" dataKey="Premium" stroke="#82ca9d" />
+                    <Line type="monotone" dataKey="Users" stroke="#82ca9d" />
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>

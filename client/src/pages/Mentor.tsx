@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -42,6 +42,20 @@ export function Mentor() {
   ]);
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Live session timer
+  const [sessionSecs, setSessionSecs] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setSessionSecs(s => s + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const sessionTime = `${Math.floor(sessionSecs / 60)}m ${sessionSecs % 60}s`;
+
+  // Auto-scroll to latest message
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isTyping]);
 
   const quickPrompts: QuickPrompt[] = [
     {
@@ -290,7 +304,7 @@ What programming topic can I help you with today?`;
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-muted-foreground">Session Time</span>
-                <span className="font-semibold">12 min</span>
+                <span className="font-semibold tabular-nums">{sessionTime}</span>
               </div>
             </CardContent>
           </Card>
@@ -366,6 +380,7 @@ What programming topic can I help you with today?`;
                   </div>
                 </div>
               )}
+              <div ref={messagesEndRef} />
             </CardContent>
 
             {/* Input */}
